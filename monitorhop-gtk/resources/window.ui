@@ -227,13 +227,14 @@
                               <object class="GtkAdjustment" id="release_threshold_adjustment">
                                 <property name="lower">0</property>
                                 <property name="upper">500</property>
-                                <property name="step-increment">10</property>
+                                <property name="step-increment">1</property>
                                 <property name="page-increment">50</property>
                                 <property name="value">0</property>
                               </object>
                             </property>
                             <marks>
                               <mark value="0" position="bottom">off</mark>
+                              <mark value="1" position="bottom">1</mark>
                               <mark value="50" position="bottom">50</mark>
                               <mark value="100" position="bottom">100</mark>
                               <mark value="200" position="bottom">200</mark>

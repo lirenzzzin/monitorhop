@@ -17,6 +17,15 @@ use input_event::{Event, KeyboardEvent, PointerEvent, scancode};
 
 pub use error::{CaptureCreationError, CaptureError, InputCaptureError};
 
+/// Best-effort delay between detecting that the modeled remote cursor
+/// crossed back over the host-adjacent edge and releasing capture.
+///
+/// 100 µs is the requested handoff budget. Tokio and desktop input
+/// backends do not offer a hard real-time guarantee, so the actual
+/// wake-up can be later, but there is no longer a human-perceptible
+/// delay intentionally inserted by MonitorHop.
+const WALL_PRESS_HANDOFF_DELAY: Duration = Duration::from_micros(100);
+
 pub mod clipboard;
 #[cfg(all(unix, not(target_os = "macos")))]
 pub mod desktop_entries;
@@ -223,9 +232,10 @@ pub struct InputCapture {
     /// into an explicit fallback that only kicks in when the peer
     /// can't deliver a Leave (lock screen, restricted DE, dead peer).
     wall_press_pending: bool,
-    /// Window after the threshold is crossed during which a peer
-    /// Leave can cancel the deferred AutoRelease. Sized so a
-    /// healthy LAN round-trip beats it comfortably.
+    /// Best-effort scheduling window after the threshold is crossed.
+    /// A peer Leave can still cancel the deferred AutoRelease if it
+    /// arrives first, but the local fallback does not intentionally
+    /// wait for a network round trip.
     wall_press_deadline: Duration,
     /// Timer driving the deferred fire. Reset to deadline-from-now
     /// on first threshold crossing; polled in `poll_next` so the
@@ -699,10 +709,10 @@ impl InputCapture {
                         .reset(tokio::time::Instant::now() + self.wall_press_deadline);
                     log::info!(
                         "wall-press threshold reached ({:.0}px past entry edge, {}px threshold) — \
-                         deferring AutoRelease for {}ms pending peer Leave",
+                         scheduling AutoRelease in {}µs unless peer Leave arrives first",
                         self.wall_pressure,
                         self.release_threshold_px,
-                        self.wall_press_deadline.as_millis(),
+                        self.wall_press_deadline.as_micros(),
                     );
                 }
                 // Fire is now driven by the timer in `poll_next`, not
@@ -751,7 +761,7 @@ impl InputCapture {
             peer_bounds: HashMap::new(),
             peer_sensitivity: HashMap::new(),
             wall_press_pending: false,
-            wall_press_deadline: Duration::from_millis(150),
+            wall_press_deadline: WALL_PRESS_HANDOFF_DELAY,
             wall_press_timer: Box::pin(tokio::time::sleep(Duration::from_secs(0))),
         })
     }
@@ -794,9 +804,9 @@ impl Stream for InputCapture {
         if self.wall_press_pending && self.wall_press_timer.as_mut().poll(cx).is_ready() {
             self.wall_press_pending = false;
             log::info!(
-                "wall-press deadline elapsed ({}ms) — firing AutoRelease (no peer Leave; \
+                "wall-press deadline elapsed ({}µs) — firing AutoRelease (no peer Leave; \
                  assuming peer-side capture is unavailable, e.g. lock screen)",
-                self.wall_press_deadline.as_millis(),
+                self.wall_press_deadline.as_micros(),
             );
             if let Some(pos) = self.capture_pos {
                 if let Some(ids) = self.position_map.get(&pos).cloned() {
@@ -966,4 +976,18 @@ async fn create(
         }
     }
     Err(CaptureCreationError::NoAvailableBackend)
+}
+
+#[cfg(test)]
+mod handoff_tests {
+    use super::*;
+
+    #[test]
+    fn return_handoff_has_a_100_microsecond_software_budget() {
+        assert_eq!(
+            WALL_PRESS_HANDOFF_DELAY,
+            Duration::from_micros(100),
+            "0.1 ms must not be rounded to a millisecond in MonitorHop"
+        );
+    }
 }

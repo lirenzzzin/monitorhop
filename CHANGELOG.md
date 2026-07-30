@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.2 - 2026-07-30
+
+- Faz o teclado seguir o `Begin` do cursor imediatamente, sem aguardar o ACK
+  de entrada nem descartar teclas digitadas durante o round trip.
+- Reduz o orçamento de software do fallback de retorno de 150 ms para 100 µs
+  (0,1 ms), sem prometer tempo real do sistema operacional ou da rede.
+- Usa limiar padrão de 1 px para liberar clientes X11 sem captura de borda.
+
 ## 0.1.1 - 2026-07-30
 
 - Ativa por padrão o auto-release de 50 px para o cursor conseguir retornar de

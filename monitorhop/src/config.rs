@@ -588,12 +588,13 @@ impl Config {
     }
 
     /// Pixel threshold for the wall-press auto-release fallback.
-    /// 0 disables it; new configurations default to 50 px.
+    /// 0 disables it; new configurations default to 1 px so capture
+    /// releases on the first modeled pixel beyond the return edge.
     pub fn release_threshold_px(&self) -> u32 {
         self.config_toml
             .as_ref()
             .and_then(|c| c.release_threshold_px)
-            .unwrap_or(50)
+            .unwrap_or(1)
     }
 
     pub fn set_release_threshold_px(&mut self, threshold: u32) {

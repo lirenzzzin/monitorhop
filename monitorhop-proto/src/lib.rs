@@ -90,7 +90,7 @@ impl Display for Position {
 #[derive(Clone, Debug)]
 pub enum ProtoEvent {
     /// notify a client that the cursor entered its region at the given position
-    /// [`ProtoEvent::Ack`] with the same serial is used for synchronization between devices
+    /// [`ProtoEvent::Ack`] confirms receipt but does not gate subsequent input
     Enter(Position),
     /// notify a client that the cursor left its region
     /// [`ProtoEvent::Ack`] with the same serial is used for synchronization between devices

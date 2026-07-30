@@ -83,7 +83,7 @@ Exemplo reduzido:
 
 ```toml
 port = 4252
-release_threshold_px = 50
+release_threshold_px = 1
 
 [authorized_fingerprints."fingerprint-do-peer"]
 description = "notebook"
@@ -97,12 +97,15 @@ activate_on_startup = true
 clipboard_send = true
 ```
 
-`release_threshold_px = 50` devolve o cursor ao computador de origem quando
-você o empurra contra a borda de retorno. O valor é o padrão do MonitorHop e é
-especialmente importante quando o destino usa X11, que nesta versão recebe
-mouse e teclado, mas não possui captura de borda própria. Use `0` para
-desativar e depender apenas do atalho de liberação ou do evento enviado pelo
-peer.
+`release_threshold_px = 1` devolve o cursor ao computador de origem assim que
+o modelo remoto detecta a travessia da borda de retorno. O teclado troca de
+destino no mesmo evento de entrada do cursor, sem aguardar o ACK da rede. O
+fallback de retorno é agendado com orçamento de 100 µs (0,1 ms), embora Linux,
+Tokio, o backend gráfico e a rede não ofereçam garantia de tempo real.
+Esse ajuste é especialmente importante quando o destino usa X11, que nesta
+versão recebe mouse e teclado, mas não possui captura de borda própria. Use
+`0` para desativar e depender apenas do atalho de liberação ou do evento
+enviado pelo peer.
 
 ## Como o clipboard confiável funciona
 

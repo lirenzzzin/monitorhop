@@ -37,7 +37,7 @@ Se o nome de usuário remoto não for `loxnote`, substitua-o nos dois comandos.
 No PC, adicione:
 
 ```toml
-release_threshold_px = 50
+release_threshold_px = 1
 
 [[clients]]
 hostname = "LoxNote"
@@ -61,9 +61,12 @@ clipboard_send = true
 Depois de iniciar ambos, autorize as fingerprints pela interface e habilite
 `clipboard_receive` nas duas conexões de entrada.
 
-O `release_threshold_px` é necessário para o retorno suave do X11: ao empurrar
-o cursor 50 px contra a borda direita do notebook, o PC libera a captura e
-reposiciona o cursor na própria borda esquerda.
+O `release_threshold_px` é necessário para o retorno do X11. Com o valor `1`,
+o primeiro pixel de movimento além da borda direita modelada do notebook
+agenda a liberação no PC em 100 µs (0,1 ms), sem aguardar um round trip. Esse
+é um orçamento de software, não uma garantia de tempo real do sistema
+operacional. O teclado passa a seguir o mesmo `Begin` do cursor sem esperar
+ACK.
 
 ## Validação rápida
 

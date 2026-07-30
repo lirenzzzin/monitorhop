@@ -33,6 +33,7 @@
        Version history section on the listing page; the latest
        release is the only one strictly required. -->
   <releases>
+    <release version="0.1.2" date="2026-07-30"/>
     <release version="0.1.1" date="2026-07-30"/>
     <release version="0.1.0" date="2026-07-30"/>
   </releases>

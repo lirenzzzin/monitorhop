@@ -101,7 +101,6 @@ impl Capture {
             request_rx,
             release_bind: Rc::new(RefCell::new(release_bind)),
             release_threshold_px: Rc::new(RefCell::new(release_threshold_px)),
-            state: Default::default(),
         };
         let task = spawn_local(capture_task.run());
         Self {
@@ -192,7 +191,6 @@ struct CaptureTask {
     release_bind: Rc<RefCell<Vec<scancode::Linux>>>,
     release_threshold_px: Rc<RefCell<u32>>,
     request_rx: Receiver<CaptureRequest>,
-    state: State,
 }
 
 impl CaptureTask {
@@ -315,10 +313,10 @@ impl CaptureTask {
                     }
 
                     match event {
-                        // connection acknowlegded => set state to Sending
+                        // Receipt confirmation is useful for liveness and
+                        // geometry replies, but no longer gates input.
                         ProtoEvent::Ack(_) => {
                             log::info!("client {handle} acknowledged the connection!");
-                            self.state = State::Sending;
                         }
                         // Peer sent Leave — either they just released
                         // their own outbound capture, or they're
@@ -442,7 +440,6 @@ impl CaptureTask {
 
         // activated a new client
         if matches!(event, CaptureEvent::Begin { .. }) && Some(handle) != self.active_client {
-            self.state = State::WaitingForAck;
             self.active_client.replace(handle);
             self.event_tx
                 .send(ICaptureEvent::ClientEntered(handle))
@@ -472,15 +469,7 @@ impl CaptureTask {
             None
         };
 
-        let proto_event = match &event {
-            CaptureEvent::Begin { .. } => ProtoEvent::Enter(opposite_pos),
-            CaptureEvent::Input(e) => match self.state {
-                // connection not acknowledged, repeat `Enter` event
-                State::WaitingForAck => ProtoEvent::Enter(opposite_pos),
-                State::Sending => ProtoEvent::Input(e.clone()),
-            },
-            CaptureEvent::AutoRelease => unreachable!("handled in early return above"),
-        };
+        let proto_event = proto_event_for_capture(&event, opposite_pos);
 
         if let Err(e) = self.conn.send(proto_event, handle).await {
             const DUR: Duration = Duration::from_millis(500);
@@ -578,11 +567,23 @@ thread_local! {
     static PREV_LOG: Cell<Option<Instant>> = const { Cell::new(None) };
 }
 
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-enum State {
-    #[default]
-    WaitingForAck,
-    Sending,
+/// Convert capture events directly to their wire representation.
+///
+/// `Enter` and subsequent input are sent sequentially over the same
+/// established DTLS connection. Do not wait for the Enter ACK here:
+/// that round trip used to turn every key pressed during handoff into
+/// another Enter packet, making the keyboard appear to lag behind the
+/// cursor. The receiver lazily creates its emulation handle from the
+/// first Input, so it is ready without an ACK-gated state transition.
+fn proto_event_for_capture(
+    event: &CaptureEvent,
+    opposite_pos: monitorhop_proto::Position,
+) -> ProtoEvent {
+    match event {
+        CaptureEvent::Begin { .. } => ProtoEvent::Enter(opposite_pos),
+        CaptureEvent::Input(event) => ProtoEvent::Input(event.clone()),
+        CaptureEvent::AutoRelease => unreachable!("handled before wire conversion"),
+    }
 }
 
 fn to_capture_pos(pos: monitorhop_ipc::Position) -> input_capture::Position {
@@ -621,5 +622,33 @@ impl<T> Drop for DropGuard<T> {
         self.tx
             .send(self.on_drop.take().expect("item"))
             .expect("channel closed");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn keyboard_routes_to_peer_immediately_after_edge_crossing() {
+        let keyboard = Event::Keyboard(KeyboardEvent::Key {
+            time: 7,
+            key: 30,
+            state: 1,
+        });
+
+        let wire = proto_event_for_capture(
+            &CaptureEvent::Input(keyboard),
+            monitorhop_proto::Position::Right,
+        );
+
+        assert!(matches!(
+            wire,
+            ProtoEvent::Input(Event::Keyboard(KeyboardEvent::Key {
+                time: 7,
+                key: 30,
+                state: 1,
+            }))
+        ));
     }
 }

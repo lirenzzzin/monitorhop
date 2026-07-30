@@ -2246,7 +2246,7 @@ dependencies = [
 
 [[package]]
 name = "monitorhop"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "clap 4.6.0",
  "env_logger",
@@ -2285,7 +2285,7 @@ dependencies = [
 
 [[package]]
 name = "monitorhop-cli"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "clap 4.6.0",
  "futures",
@@ -2296,7 +2296,7 @@ dependencies = [
 
 [[package]]
 name = "monitorhop-gtk"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "async-channel",
  "glib-build-tools",
@@ -2313,7 +2313,7 @@ dependencies = [
 
 [[package]]
 name = "monitorhop-input-capture"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "arboard",
  "ashpd",
@@ -2350,7 +2350,7 @@ dependencies = [
 
 [[package]]
 name = "monitorhop-input-emulation"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "arboard",
  "ashpd",
@@ -2377,7 +2377,7 @@ dependencies = [
 
 [[package]]
 name = "monitorhop-input-event"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "futures-core",
  "log",
@@ -2389,7 +2389,7 @@ dependencies = [
 
 [[package]]
 name = "monitorhop-ipc"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "futures",
  "log",
@@ -2403,7 +2403,7 @@ dependencies = [
 
 [[package]]
 name = "monitorhop-proto"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "monitorhop-input-event",
  "num_enum",
