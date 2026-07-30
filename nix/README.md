@@ -1,58 +1,22 @@
-# Nix Flake Usage
+# Nix
 
-## Run
+Execute o flake diretamente a partir do checkout:
 
-```bash
-nix run github:jondkinney/mousehop
-
-# With params
-nix run github:jondkinney/mousehop -- --help
-
+```sh
+nix run .
+nix run . -- --help
 ```
 
-## Home-manager module
+Ou diretamente do GitHub:
 
-Add input:
+```sh
+nix run github:lirenzzzin/monitorhop
+```
+
+Como entrada de outro flake:
 
 ```nix
-inputs = {
-    mousehop.url = "github:jondkinney/mousehop";
-}
-```
-
-Optional: once a [cachix cache](https://app.cachix.org/cache/mousehop) is set up
-for this fork, add it as a binary cache for faster package installs.
-
-```nix
-nixConfig = {
-    extra-substituters = [
-        "https://mousehop.cachix.org/"
-    ];
-    extra-trusted-public-keys = [
-        # TODO: add the public key for the `mousehop` cachix cache once it
-        # exists, e.g. "mousehop.cachix.org-1:<public-key>"
-    ];
-};
-```
-
-Enable mousehop:
-
-``` nix
 {
-  inputs,
-  ...
-}: {
-  # Add the Home Manager module
-  imports = [inputs.mousehop.homeManagerModules.default];
-
-  programs.mousehop = {
-    enable = true;
-    # systemd = false;
-    # package = inputs.mousehop.packages.${pkgs.stdenv.hostPlatform.system}.default
-    # Optional configuration in nix syntax, see config.toml for available options
-    # settings = { };
-    };
-  };
+  inputs.monitorhop.url = "github:lirenzzzin/monitorhop";
 }
-
 ```

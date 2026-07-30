@@ -194,7 +194,7 @@ impl Window {
             &surface,
             Some(output),
             Layer::Overlay,
-            "Mousehop Sharing".into(),
+            "MonitorHop Sharing".into(),
             qh,
             (),
         );

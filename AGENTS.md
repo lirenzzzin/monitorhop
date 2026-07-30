@@ -1,8 +1,8 @@
-# Mousehop Agent Instructions
+# MonitorHop Agent Instructions
 
 ## Overview
 
-Mousehop is an open-source Software KVM sharing mouse/keyboard input across local networks. The Rust workspace combines a GTK frontend, CLI/daemon mode, and multi-OS capture/emulation backends for Linux, Windows, and macOS.
+MonitorHop is an open-source Software KVM sharing mouse/keyboard input across local networks. The Rust workspace combines a GTK frontend, CLI/daemon mode, and multi-OS capture/emulation backends for Linux, Windows, and macOS.
 
 ## Core principles
 
@@ -19,11 +19,11 @@ Mousehop is an open-source Software KVM sharing mouse/keyboard input across loca
 
 ## Architecture
 
-**Pipeline:** `input-capture` → `mousehop-ipc` → `input-emulation`
+**Pipeline:** `input-capture` → `monitorhop-ipc` → `input-emulation`
 
 - **input-capture:** Reads OS events into a `Stream<CaptureEvent>`. Backends tried in priority order (libei → layer-shell → X11 → fallback). Tracks `pressed_keys` to avoid stuck modifiers. `position_map` queues events when multiple clients share a screen edge.
 - **input-emulation:** Replays events via the `Emulation` trait (`consume`, `create`, `destroy`, `terminate`). Maintains `pressed_keys` and releases them on disconnect.
-- **mousehop-ipc / mousehop-proto:** Protocol glue and serialization. Events are UDP; connection requests are TCP on the same port. Version bumps required when serialization changes.
+- **monitorhop-ipc / monitorhop-proto:** Protocol glue and serialization. Events are UDP; connection requests are TCP on the same port. Version bumps required when serialization changes.
 - **input-event:** Shared scancode enums and abstract event types—extend here, don't duplicate translations.
 
 ## Feature & cfg discipline
@@ -45,7 +45,7 @@ cargo build --workspace                                    # full build
 cargo build -p <crate>                                     # single crate
 cargo test --workspace                                     # all tests
 cargo fmt && cargo clippy --workspace --all-targets --all-features  # lint
-RUST_LOG=mousehop=debug cargo run                         # debug logging
+RUST_LOG=monitorhop=debug cargo run                         # debug logging
 ```
 
 Run from repo root—no `cd` in scripts.

@@ -7,7 +7,7 @@
 //! locally rather than going on the wire.
 //!
 //! Each platform returns a `Some(AppIdent)` whose variant matches
-//! the OS — see [`AppIdent`] in `mousehop-ipc`. None means we
+//! the OS — see [`AppIdent`] in `monitorhop-ipc`. None means we
 //! couldn't determine the active app (no compositor support, no
 //! permissions, transient race, …); the caller treats that as "not
 //! suppressed."
@@ -28,7 +28,7 @@
 //! same objc bridge to check `NSPasteboard.types` for
 //! `org.nspasteboard.ConcealedType`.
 
-use mousehop_ipc::{AppIdent, RunningApp};
+use monitorhop_ipc::{AppIdent, RunningApp};
 
 /// Helpers used by the Linux backend and exercised by Linux-only
 /// unit tests. Module-scoped (rather than nested inside the
@@ -49,7 +49,7 @@ pub(crate) mod backend_helpers {
     }
 }
 
-pub use mousehop_ipc::AppIdent as AppIdentRe;
+pub use monitorhop_ipc::AppIdent as AppIdentRe;
 
 /// Best-effort lookup of the application whose window is currently
 /// frontmost. Returns `None` when the platform doesn't support the
@@ -190,7 +190,7 @@ mod backend {
             }
             // Hide our own bundle — suppressing your own clipboard
             // app makes no sense (we ARE the clipboard sender).
-            if identifier == "com.mousehop.Mousehop" {
+            if identifier == "dev.monitorhop.MonitorHop" {
                 continue;
             }
             let icon_png = cached_or_encoded_icon(identifier, path);

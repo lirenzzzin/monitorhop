@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="tile" x1="120" y1="120" x2="904" y2="904" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B1220"/>
+      <stop offset="1" stop-color="#172554"/>
+    </linearGradient>
+    <linearGradient id="bridge" x1="330" y1="512" x2="694" y2="512" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#22D3EE"/>
+      <stop offset="1" stop-color="#A78BFA"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="230" fill="url(#tile)"/>
+  <!-- Two displays connected by one continuous clipboard bridge. -->
+  <rect x="132" y="272" width="304" height="274" rx="42" fill="#111827"
+        stroke="#22D3EE" stroke-width="34"/>
+  <rect x="588" y="272" width="304" height="274" rx="42" fill="#111827"
+        stroke="#A78BFA" stroke-width="34"/>
+  <path d="M284 546v84m456-84v84M212 650h144m312 0h144"
+        fill="none" stroke="#E5E7EB" stroke-width="30" stroke-linecap="round"/>
+  <path d="M382 412h260" fill="none" stroke="url(#bridge)"
+        stroke-width="42" stroke-linecap="round"/>
+  <path d="m604 370 48 42-48 42" fill="none" stroke="#A78BFA"
+        stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Clipboard card: the shared state at the center of the hop. -->
+  <rect x="386" y="516" width="252" height="244" rx="46" fill="#F8FAFC"/>
+  <rect x="454" y="482" width="116" height="66" rx="28" fill="url(#bridge)"/>
+  <path d="m452 642 38 38 82-86" fill="none" stroke="#172554"
+        stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

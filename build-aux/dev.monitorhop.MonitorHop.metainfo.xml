@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>dev.monitorhop.MonitorHop</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>MonitorHop</name>
+  <summary>Share one mouse, keyboard, and clipboard across machines</summary>
+  <icon type="stock">dev.monitorhop.MonitorHop</icon>
+  <launchable type="desktop-id">dev.monitorhop.MonitorHop.desktop</launchable>
+  <description>
+    <p>
+      MonitorHop is an open-source software KVM. Glide a single mouse, keyboard, and
+      clipboard across Linux, macOS, and Windows machines over the local network — no
+      KVM hardware, no cloud service.
+    </p>
+    <p>
+      MonitorHop descends from lan-mouse and Mousehop under GPL-3.0-or-later. It adds
+      acknowledged, chunked clipboard transfers with integrity verification.
+    </p>
+  </description>
+  <categories>
+    <category>Utility</category>
+    <category>Network</category>
+  </categories>
+  <!-- OARS: every age-rating attribute defaults to "none", which is
+       correct for a software KVM. Peer-to-peer over the user's own
+       LAN with their own machines doesn't trigger social-info (which
+       is scoped to third-party sharing). Self-closing element is the
+       standard Flathub shorthand for an all-clean rating. -->
+  <content_rating type="oars-1.1"/>
+  <!-- Per-release entries: prepend a new <release> at the top when
+       release-plz cuts a new tag. Required by Flathub for the
+       Version history section on the listing page; the latest
+       release is the only one strictly required. -->
+  <releases>
+    <release version="0.1.0" date="2026-07-30"/>
+  </releases>
+  <url type="homepage">https://github.com/lirenzzzin/monitorhop</url>
+  <url type="bugtracker">https://github.com/lirenzzzin/monitorhop/issues</url>
+  <developer_name>MonitorHop contributors</developer_name>
+</component>

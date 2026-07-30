@@ -1,16 +1,19 @@
-Mousehop
-========
+MonitorHop
+==========
 
-Mousehop is a fork of lan-mouse (https://github.com/feschber/lan-mouse).
+MonitorHop is a fork of lan-mouse (https://github.com/feschber/lan-mouse).
 
 Original work Copyright (C) 2022 Ferdinand Schober and the lan-mouse
 contributors. Licensed under the GNU General Public License, version 3
 or (at your option) any later version.
 
-This is a modified version. The project was forked beginning in April
-2026 and rebranded as "Mousehop" in May 2026. Modifications for the
-Mousehop fork are Copyright (C) 2026 Jon Kinney and the Mousehop
-contributors, and are likewise licensed under the GNU General Public
-License, version 3 or any later version.
+MonitorHop also incorporates work from Mousehop
+(https://github.com/jondkinney/mousehop), a lan-mouse fork.
+Mousehop modifications are Copyright (C) 2026 Jon Kinney and the
+Mousehop contributors.
+
+MonitorHop modifications are Copyright (C) 2026 the MonitorHop
+contributors. All modifications remain licensed under the GNU General
+Public License, version 3 or any later version.
 
 See the LICENSE file for the full text of the license.

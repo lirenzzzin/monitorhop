@@ -1,536 +1,144 @@
-<h1>
-  <img src="assets/icons/png/mousehop-512.png" alt="Mousehop icon" width="72" height="72" align="middle">
-  &nbsp;Mousehop
-</h1>
+# MonitorHop
 
-[![CI](https://github.com/jondkinney/mousehop/actions/workflows/rust.yml/badge.svg)](https://github.com/jondkinney/mousehop/actions/workflows/rust.yml) [![Cachix](https://github.com/jondkinney/mousehop/actions/workflows/cachix.yml/badge.svg)](https://github.com/jondkinney/mousehop/actions/workflows/cachix.yml) [![Release](https://github.com/jondkinney/mousehop/actions/workflows/release.yml/badge.svg)](https://github.com/jondkinney/mousehop/actions/workflows/release.yml)
+MonitorHop é um KVM de software para compartilhar mouse, teclado e clipboard
+entre computadores. Ele é um fork GPL do
+[lan-mouse](https://github.com/feschber/lan-mouse), incorpora melhorias do
+[Mousehop](https://github.com/jondkinney/mousehop) e adiciona um protocolo de
+clipboard confiável para uso diário.
 
-[![license: GPL-3.0](https://img.shields.io/badge/license-GPL--3.0-blue.svg)](./LICENSE)
+O objetivo principal é funcionar bem em combinações Linux reais, inclusive um
+servidor Wayland/niri controlando um cliente X11.
 
-> Mousehop is a fork of [lan-mouse](https://github.com/feschber/lan-mouse) by
-> Ferdinand Schober ([feschber](https://github.com/feschber)) and its
-> contributors. Forked in April 2026 and rebranded as Mousehop in May 2026,
-> it is a modified version distributed under the same GNU GPL-3.0-or-later
-> license. Huge thanks to the original author and contributors — see
-> [`NOTICE`](./NOTICE) for attribution details.
+Repositório: [lirenzzzin/monitorhop](https://github.com/lirenzzzin/monitorhop)
 
-Mousehop is a *cross-platform* mouse and keyboard sharing software similar to universal-control on Apple devices.
-It allows for using multiple PCs via a single set of mouse and keyboard.
-This is also known as a Software KVM switch.
+## O que funciona
 
-Goal of this project is to be an open-source alternative to proprietary tools like [Synergy 2/3](https://symless.com/synergy), [Share Mouse](https://www.sharemouse.com/de/)
-and other open source tools like [Deskflow](https://github.com/deskflow/deskflow) or [Input Leap](https://github.com/input-leap) (Synergy fork).
+- Mouse e teclado com troca pela borda da tela.
+- Clipboard de texto Unicode bidirecional, inclusive texto multilinha e código.
+- Conteúdo de clipboard de até 2 MiB.
+- Fragmentação em datagramas de até 1200 bytes, evitando depender de
+  fragmentação IP.
+- Verificação SHA-256 após remontagem.
+- Confirmação do receptor e até quatro retransmissões automáticas.
+- Remontagem de blocos duplicados ou fora de ordem.
+- Supressão de eco e de loops quando existem mais de duas máquinas.
+- Autorização por fingerprint e transporte DTLS criptografado.
+- Permissões independentes por par: enviar e receber clipboard.
+- Lista de aplicativos cujo clipboard nunca deve ser enviado, útil para
+  gerenciadores de senha.
+- Interface GTK/libadwaita e modo daemon.
 
-Focus lies on performance, ease of use and a maintainable implementation that can be expanded to support additional backends for e.g. Android, iOS, ... in the future.
+O clipboard da versão 0.1 sincroniza **texto**. Imagens, arquivos e tipos MIME
+arbitrários ainda não fazem parte do protocolo.
 
-***blazingly fast™*** because it's written in rust.
+## Compilar no Arch, CachyOS ou EndeavourOS
 
-- _Now with a gtk frontend_
-
-<p align="center">
-    <img alt="The Mousehop main window: General settings, Outgoing Auto-Release threshold, paired peers, mDNS discovery, and Clipboard Privacy"
-         src="screenshots/mousehop-prefs.png"
-         width="420">
-</p>
-
-
-## Encryption
-
-Mousehop encrypts all network traffic using the DTLS implementation provided by [WebRTC.rs](https://github.com/webrtc-rs/webrtc).
-There are currently no mitigations in place for timing side-channel attacks.
-
-## OS Support
-
-Most current desktop environments and operating systems are fully supported, this includes
-- GNOME >= 45
-- KDE Plasma >= 6.1
-- Most wlroots based compositors, including Sway (>= 1.8), Hyprland and Wayfire
-- Windows
-- MacOS
-
-
-### Caveats / Known Issues
-
-> [!Important]
-> - **X11** currently only has support for input emulation, i.e. can only be used on the receiving end.
->
-> - **Sway / wlroots**: Wlroots based compositors without libei support on the receiving end currently do not handle modifier events on the client side.
-> This results in CTRL / SHIFT / ALT / SUPER keys not working with a sending device that is NOT using the `layer-shell` backend
->
-> - **Wayfire**: If you are using [Wayfire](https://github.com/WayfireWM/wayfire), make sure to use a recent version (must be newer than October 23rd) and **add `shortcuts-inhibit` to the list of plugins in your wayfire config!**
-> Otherwise input capture will not work.
->
-> - **Windows**: The mouse cursor will be invisible when sending input to a Windows system if
-> there is no real mouse connected to the machine.
-
-For more detailed information about os support see [Detailed OS Support](#detailed-os-support)
-
-### Android & IOS
-
-A proof of concept for an Android / IOS Application by [rohitsangwan01](https://github.com/rohitsangwan01) can be found [here](https://github.com/rohitsangwan01/lan-mouse-mobile).
-It can be used as a remote control for any device supported by Mousehop.
-
-## Installation
-
-> Mousehop is a young fork and is not yet packaged in distribution
-> repositories (Arch, Fedora, nixpkgs). Until then, install from a release
-> binary, the Nix flake, or build from source.
-
-<details>
-    <summary>Nix (flake)</summary>
-
-- flake: [README.md](./nix/README.md)
-</details>
-
-<details>
-    <summary>MacOS</summary>
-
-- Download the `.dmg` for your Mac (Intel or Apple Silicon) from the releases page
-- Open the `.dmg` and drag `Mousehop.app` into `Applications`
-- Launch the app — release builds are signed with a Developer ID and notarized by Apple, so it opens with no Gatekeeper prompt
-- Use the menu bar item to open the settings window or quit Mousehop. Bundled macOS builds run as a menu bar app and do not keep a Dock icon visible.
-- Grant accessibility permissions in System Settings
-
-</details>
-
-
-<details>
-    <summary>Manual Installation</summary>
-
-First make sure to [install the necessary dependencies](#installing-dependencies-for-development--compiling-from-source).
-
-Precompiled release binaries for Windows, MacOS and Linux are available in the [releases section](https://github.com/jondkinney/mousehop/releases).
-For Windows, the depenedencies are included in the .zip file, for other operating systems see [Installing Dependencies](#installing-dependencies-for-development--compiling-from-source).
-
-Alternatively, the `mousehop` binary can be compiled from source (see below).
-
-### Installing desktop file, app icon and firewall rules (optional)
-```sh
-# install mousehop (replace path/to/ with the correct path)
-sudo cp path/to/mousehop /usr/local/bin/
-
-# install app icon
-sudo mkdir -p /usr/local/share/icons/hicolor/scalable/apps
-sudo cp mousehop-gtk/resources/com.mousehop.Mousehop.svg /usr/local/share/icons/hicolor/scalable/apps
-
-# update icon cache
-gtk-update-icon-cache /usr/local/share/icons/hicolor/
-
-# install desktop entry
-sudo mkdir -p /usr/local/share/applications
-sudo cp com.mousehop.Mousehop.desktop /usr/local/share/applications
-
-# when using firewalld: install firewall rule
-sudo cp firewall/mousehop.xml /etc/firewalld/services
-# -> enable the service in firewalld settings
-```
-
-Instead of downloading from the releases, the `mousehop` binary
-can be easily compiled via cargo or nix:
-
-### Compiling and installing manually:
-```sh
-# compile in release mode
-cargo build --release
-
-# install mousehop
-sudo cp target/release/mousehop /usr/local/bin/
-```
-
-### Compiling and installing via cargo:
-```sh
-# will end up in ~/.cargo/bin
-cargo install --git https://github.com/jondkinney/mousehop
-```
-
-### Compiling and installing via nix:
-```sh
-# you can find the executable in result/bin/mousehop
-nix-build
-```
-### Conditional compilation
-Support for other platforms is omitted automatically based on the active
-rust toolchain.
-
-Additionally, available backends and frontends can be configured manually via
-[cargo features](https://doc.rust-lang.org/cargo/reference/features.html).
-
-E.g. if only support for sway is needed, the following command produces
-an executable with support for only the `layer-shell` capture backend
-and `wlroots` emulation backend:
-```sh
-cargo build --no-default-features --features layer_shell_capture,wlroots_emulation
-```
-For a detailed list of available features, checkout the [Cargo.toml](./Cargo.toml)
-</details>
-
-
-
-## Development
-
-### Git pre-commit hook
-
-This repository includes a local git hooks directory `.githooks/` with a `pre-commit` script that enforces formatting, lints, and tests before allowing a commit.  It is optional to enable it, but it will prevent you from committing code with failing unit tests or that needs clippy/fmt fixes. To enable the hook locally:
-
-1. Make the hook executable:
+Dependências do sistema:
 
 ```sh
-chmod +x .githooks/pre-commit
+sudo pacman -S --needed base-devel gtk4 libadwaita libx11 libxtst
 ```
 
-2. Point git to the hooks directory (one-time per clone):
+O projeto fixa o Rust 1.95 em `rust-toolchain.toml`. Com `rustup` disponível:
 
 ```sh
-git config core.hooksPath .githooks
+cargo build --release --workspace
 ```
 
-The `pre-commit` script runs `cargo fmt --all` (and fails if files were modified), `cargo clippy --workspace --all-targets --all-features -- -D warnings`, and `cargo test --workspace --all-features`.
+O executável fica em:
 
-### Dependencies & Compiling from Source
-<details>
-    <summary>MacOS</summary>
+```text
+target/release/monitorhop
+```
+
+Para instalar apenas para o usuário:
 
 ```sh
-# Install dependencies
-brew install libadwaita pkg-config imagemagick
-cargo install cargo-bundle
-# Create the macOS icon file
-scripts/makeicns.sh
-# Create the .app bundle
-cargo bundle
-# Copy all dynamic libraries into the bundle, and update the bundle to find them there
-scripts/copy-macos-dylib.sh
-```
-</details>
-
-<details>
-    <summary>Ubuntu and derivatives</summary>
-
-```sh
-sudo apt install libadwaita-1-dev libgtk-4-dev libx11-dev libxtst-dev
-```
-</details>
-
-<details>
-    <summary>Arch and derivatives</summary>
-
-```sh
-sudo pacman -S libadwaita gtk libx11 libxtst
-```
-</details>
-
-<details>
-    <summary>Fedora and derivatives</summary>
-
-```sh
-sudo dnf install libadwaita-devel libXtst-devel libX11-devel
-```
-</details>
-<details>
-    <summary>Nix</summary>
-
-```sh
-nix-shell .
-```
-</details>
-<details>
-    <summary>Nix (flake)</summary>
-
-```sh
-nix develop
-```
-</details>
-
-<details>
-    <summary>Windows</summary>
-
-- First install [Rust](https://www.rust-lang.org/tools/install).
-
-- Then follow the instructions at [gtk-rs.org](https://gtk-rs.org/gtk4-rs/stable/latest/book/installation_windows.html)
-
-*TLDR:*
-
-Build gtk from source
-
-- The following commands should be run in an **admin power shell** instance:
-```sh
-# install chocolatey
-Set-ExecutionPolicy Bypass -Scope Process -Force; iex ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
-
-# install gvsbuild dependencies
-choco install python git msys2 visualstudio2022-workload-vctools
+install -Dm755 target/release/monitorhop ~/.local/bin/monitorhop
 ```
 
-- The following commands should be run in a **regular power shell** instance:
+Na primeira execução, a aplicação instala o arquivo `.desktop` e o ícone no
+perfil do usuário.
 
-```sh
-# install gvsbuild with python
-python -m pip install --user pipx
-python -m pipx ensurepath
+## Configurar duas máquinas
+
+Execute `monitorhop` nas duas máquinas. Na interface:
+
+1. Adicione a outra máquina como peer e informe hostname ou IP.
+2. Escolha a posição física do peer.
+3. Autorize a fingerprint apresentada pela outra máquina.
+4. Ative `Send clipboard` no peer de saída.
+5. Ative `Receive clipboard` na fingerprint de entrada.
+
+As duas permissões precisam estar ativas para cada direção desejada. Isso evita
+que uma atualização habilite transmissão de clipboard sem consentimento.
+
+A configuração fica em:
+
+```text
+~/.config/monitorhop/config.toml
 ```
 
-- Relaunch your powershell instance so the changes in the environment are reflected.
-```sh
-pipx install gvsbuild
-
-# build gtk + libadwaita
-gvsbuild build gtk4 libadwaita librsvg adwaita-icon-theme
-```
-
-- **Make sure to add the directory** `C:\gtk-build\gtk\x64\release\bin`
-[**to the `PATH` environment variable**]((https://learn.microsoft.com/en-us/previous-versions/office/developer/sharepoint-2010/ee537574(v=office.14))). Otherwise the project will fail to build.
-
-To avoid building GTK from source, it is possible to disable
-the gtk frontend (see conditional compilation).
-</details>
-
-## Usage
-<details>
-    <summary>Gtk Frontend</summary>
-
-By default the gtk frontend will open when running `mousehop`.
-
-To connect a device you want to control, simply click the `Add` button and enter the hostname
-of the device.
-
-On the *remote* device, authorize your *local* device for incoming traffic using the `Authorize` button
-under the "Incoming Connections" section.
-The fingerprint for authorization can be found under the general section of your *local* device.
-It is of the form "aa:bb:cc:..."
-
-Authorized devices can be persisted using the configuration file (see [Configuration](#configuration)).
-
-If the device still can not be entered, make sure you have UDP port `4252` (or the one selected) opened up in your firewall.
-</details>
-
-<details>
-    <summary>Command Line Interface</summary>
-
-The cli interface can be accessed by passing `cli` as a commandline argument.
-Use
-```sh
-mousehop cli help
-```
- to list the available commands and
-```sh
-mousehop cli <cmd> help
-```
-for information on how to use a specific command.
-
-</details>
-
-<details>
-    <summary>Daemon Mode</summary>
-
-Mousehop can be launched in daemon mode to keep it running in the background (e.g. for use in a systemd-service).
-
-To do so, use the `daemon` subcommand:
-
-```sh
-mousehop daemon
-```
-</details>
-
-## Systemd Service
-
-In order to start mousehop with a graphical session automatically,
-the [systemd-service](service/mousehop.service) can be used:
-
-Copy the file to `~/.config/systemd/user/` and enable the service:
-
-```sh
-cp service/mousehop.service ~/.config/systemd/user
-systemctl --user daemon-reload
-systemctl --user enable --now mousehop.service
-```
-> [!Important]
-> Make sure to point `ExecStart=/usr/bin/mousehop daemon` to the actual `mousehop` binary (in case it is not under `/usr/bin`, e.g. when installed manually.
-
-
-## Configuration
-To automatically load clients on startup, the file `$XDG_CONFIG_HOME/mousehop/config.toml` is parsed.
-`$XDG_CONFIG_HOME` defaults to `~/.config/`.
-
-To create this file you can copy the following example config:
-
-### Example config
-> [!TIP]
-> key symbols in the release bind are named according
-> to their names in [input-event/src/scancode.rs#L172](input-event/src/scancode.rs#L176).
-> This is bound to change
+Exemplo reduzido:
 
 ```toml
-# example configuration
-
-# configure release bind
-release_bind = [ "KeyA", "KeyS", "KeyD", "KeyF" ]
-
-# optional port (defaults to 4252)
 port = 4252
 
-# list of authorized tls certificate fingerprints that
-# are accepted for incoming traffic
-[authorized_fingerprints]
-"bc:05:ab:7a:a4:de:88:8c:2f:92:ac:bc:b8:49:b8:24:0d:44:b3:e6:a4:ef:d7:0b:6c:69:6d:77:53:0b:14:80" = "iridium"
+[authorized_fingerprints."fingerprint-do-peer"]
+description = "notebook"
+clipboard_receive = true
 
-# define a client on the right side with host name "iridium"
 [[clients]]
-# position (left | right | top | bottom)
-position = "right"
-# hostname
-hostname = "iridium"
-# activate this client immediately when mousehop is started
-activate_on_startup = true
-# optional list of (known) ip addresses
-ips = ["192.168.178.156"]
-
-# define a client on the left side with IP address 192.168.178.189
-[[clients]]
+hostname = "notebook"
+ips = ["100.64.0.2"]
 position = "left"
-# The hostname is optional: When no hostname is specified,
-# at least one ip address needs to be specified.
-hostname = "thorium"
-# ips are optional: peers running mousehop advertise every interface
-# over mDNS, so a hostname alone discovers them all
-# optional port
-port = 4252
-# optional base policy: "auto" (default) or "fastest"
-mode = "fastest"
+activate_on_startup = true
+clipboard_send = true
 ```
 
-Where `left` can be either `left`, `right`, `top` or `bottom`.
+## Como o clipboard confiável funciona
 
-### Multi-homed peers (interfaces, latency, locking)
+Cada alteração local recebe um identificador de transferência. O texto é
+codificado como UTF-8, limitado a 2 MiB e dividido em blocos de 1120 bytes.
+O início da transferência declara tamanho, quantidade de blocos e SHA-256.
 
-A peer with more than one address — e.g. a laptop wired *and* on Wi-Fi
-at the same time — advertises **every interface's** address over mDNS,
-so mousehop discovers them all without you pinning anything. By default
-it races them and uses whichever connects first, which can flap onto a
-slow Wi-Fi path. The GUI's **Connection Address** dropdown lists every
-candidate as `<ip> — Wired/Wi-Fi · <latency>` (the interface kind is
-advertised by the peer; latency is a lightweight background probe), and
-offers:
+O receptor aceita blocos duplicados ou fora de ordem, remonta o texto, verifica
+tamanho e hash e só então o encaminha ao clipboard local. Ele responde com um
+ACK autenticado pelo mesmo canal DTLS. Se o ACK não chegar, o emissor repete a
+transferência até quatro vezes.
 
-- **Auto** (default): race all candidates, biased toward the
-  mDNS-advertised primary interface.
-- **Fastest**: prefer the lowest-latency reachable candidate and stay
-  on it (sticky). It only switches when the active path dies or another
-  is *sustainedly and substantially* faster, so it never flaps. Fully
-  portable — works on any network with no configuration.
-- **A specific address**: pin the connection to that IP **on the
-  current network only**. The pin is sticky (no silent failover) and is
-  scoped by a network fingerprint (the default-gateway MAC), so a pin
-  set at home doesn't break connectivity on a different LAN — there,
-  mousehop falls back to the base `mode`.
+O envio ocorre em tarefas separadas, então uma transferência grande não
+interrompe mouse, teclado nem a interface.
 
-`mode` persists on the `[[clients]]` entry; per-network pins persist
-under a `network_locks` table (keyed by network fingerprint, numeric
-IPs only). Discovered addresses, latency, and interface labels are live
-runtime state and are not persisted.
+## Privacidade e segurança
 
-## Clipboard Sync
+- Clipboard é desativado por padrão.
+- O emissor e o receptor precisam permitir explicitamente cada direção.
+- Peers são autenticados por fingerprint de certificado.
+- Todo tráfego utiliza DTLS.
+- Aplicativos sensíveis podem ser colocados na lista de supressão.
+- No macOS, pasteboards marcados como conteúdo oculto são ignorados
+  automaticamente.
 
-Optional bi-directional clipboard text sync between paired peers. Disabled by default; enable per pair from the GUI or by editing `config.toml`.
+Nenhum conteúdo passa por nuvem ou serviço externo.
 
-### Per-pair gates
+## Desenvolvimento
 
-Each direction is independently gated. Both ends must opt in for clipboard text to flow that way:
-
-- **Outgoing**: `clipboard_send` on each `[[clients]]` entry — when true, copies on this device propagate to that peer.
-- **Incoming**: `clipboard_receive` on each `[authorized_fingerprints]` entry — when true, clipboard text from that peer is applied to this device's clipboard.
-
-Defaults are `false`. Existing pairs see no behavior change on upgrade.
-
-### Limitations
-
-- **Text only**. No images, files, RTF/HTML, or multi-format pasteboard.
-- **4 KiB max payload** (originator fingerprint + content + length prefixes, conservative against typical UDP MTU). Larger copies are dropped at the sender with a debug log; the local clipboard is unaffected.
-- **UTF-8 only**. Invalid byte sequences are rejected.
-- Polling-based change detection (no native pasteboard event API exists on macOS), so very rapid recopies within a single poll tick may be coalesced.
-
-### App-source suppression
-
-A per-OS suppression list lets you mark applications whose clipboard contents must never propagate (password managers, sensitive editors, Apple Messages, etc.). The frontmost app at the moment of copy is checked against the host-OS slot of `clipboard_suppress_apps`:
-
-```toml
-[clipboard_suppress_apps]
-macos = ["com.1password.1password", "com.apple.MobileSMS"]
-windows = ["1Password.exe"]
-linux_wayland = ["org.keepassxc.KeePassXC"]
-linux_x11 = ["KeePassXC"]
+```sh
+cargo fmt --all -- --check
+cargo test --workspace
+cargo clippy --workspace --all-targets --all-features -- -D warnings
 ```
 
-Each machine reads/writes only the slot matching its own OS — the others round-trip untouched, so a single config can be shared across machines (dotfiles / Syncthing / etc.) without any one machine bleeding identifiers into the wrong section.
+O protocolo e os limites públicos estão em
+`monitorhop-proto/src/lib.rs`. A captura do clipboard fica em
+`input-capture/src/clipboard.rs`; envio confiável e ACK ficam em
+`monitorhop/src/connect.rs` e `monitorhop/src/listen.rs`.
 
-The GUI exposes this via **Clipboard Privacy → Manage**: a searchable picker of the apps currently running on this device (with name + icon), plus a list of currently-suppressed apps with one-click removal.
+## Licença e créditos
 
-### Automatic suppression on macOS
+GPL-3.0-or-later. Consulte `LICENSE` e `NOTICE`.
 
-In addition to the user list, macOS clipboards stamped with the [`org.nspasteboard.ConcealedType`](https://nspasteboard.org/) UTI (the community convention used by 1Password, Bitwarden, KeePassXC, and most modern password managers) are auto-suppressed without needing a manual entry.
-
-### Loop prevention for 3+ peer fan-out
-
-The wire frame carries the originator's TLS certificate fingerprint. The Service tracks `(originator_fp, content_hash)` for 1 second to prevent rebroadcast cycles in N-peer topologies (A→B→C won't echo back to A).
-
-## Roadmap
-- [x] Graphical frontend (gtk + libadwaita)
-- [x] respect xdg-config-home for config file location.
-- [x] IP Address switching
-- [x] Liveness tracking Automatically ungrab mouse when client unreachable
-- [x] Liveness tracking: Automatically release keys, when server offline
-- [x] MacOS KeyCode Translation
-- [x] Libei Input Capture
-- [x] MacOS Input Capture
-- [x] Windows Input Capture
-- [x] Encryption
-- [ ] X11 Input Capture
-- [ ] Latency measurement and visualization
-- [ ] Bandwidth usage measurement and visualization
-- [x] Clipboard support (text, per-pair, with app-source suppression)
-
-
-## Detailed OS Support
-
-In order to use a device for sending events, an **input-capture** backend is required, while receiving events requires
-a supported **input-emulation** *and* **input-capture** backend.
-
-A suitable backend is chosen automatically based on the active desktop environment / compositor.
-
-The following sections detail the emulation and capture backends provided by mousehop and their support in desktop environments / operating systems.
-
-### Input Emulation Support
-
-| Desktop / Backend         | wlroots                  | libei                    | remote-desktop portal    | windows                  |   macos                                | x11                |
-|---------------------------|--------------------------|--------------------------|--------------------------|--------------------------|----------------------------------------|--------------------|
-| Wayland (wlroots)         | :heavy_check_mark:       |                          |                          |                          |                                        |                    |
-| Wayland (KDE)             |                          | :heavy_check_mark:       | :heavy_check_mark:       |                          |                                        |                    |
-| Wayland (Gnome)           |                          | :heavy_check_mark:       | :heavy_check_mark:       |                          |                                        |                    |
-| Windows                   |                          |                          |                          | :heavy_check_mark:       |                                        |                    |
-| MacOS                     |                          |                          |                          |                          |   :heavy_check_mark:                   |                    |
-| X11                       |                          |                          |                          |                          |                                        | :heavy_check_mark: |
-
-- `wlroots`: This backend makes use of the [wlr-virtual-pointer-unstable-v1](https://wayland.app/protocols/wlr-virtual-pointer-unstable-v1) and [virtual-keyboard-unstable-v1](https://wayland.app/protocols/virtual-keyboard-unstable-v1) protocols and is supported by most wlroots based compositors.
-- `libei`: This backend uses [libei](https://gitlab.freedesktop.org/libinput/libei) and is supported by GNOME >= 45 or KDE Plasma >= 6.1.
-- `xdp`: This backend uses the [freedesktop remote-desktop-portal](https://flatpak.github.io/xdg-desktop-portal/#gdbus-org.freedesktop.portal.RemoteDesktop) and is supported on GNOME and Plasma.
-- `x11`: Backend for X11 sessions.
-- `windows`: Backend for Windows.
-- `macos`: Backend for MacOS.
-
-
-
-### Input Capture Support
-
-| Desktop / Backend         | layer-shell              | libei                    | windows                  |   macos                                | x11 |
-|---------------------------|--------------------------|--------------------------|--------------------------|----------------------------------------|-----|
-| Wayland (wlroots)         | :heavy_check_mark:       |                          |                          |                                        |     |
-| Wayland (KDE)             | :heavy_check_mark:       | :heavy_check_mark:       |                          |                                        |     |
-| Wayland (Gnome)           |                          | :heavy_check_mark:       |                          |                                        |     |
-| Windows                   |                          |                          | :heavy_check_mark:       |                                        |     |
-| MacOS                     |                          |                          |                          |   :heavy_check_mark:                   |     |
-| X11                       |                          |                          |                          |                                        | WIP |
-
-- `layer-shell`: This backend creates a single pixel wide window on the edges of Displays to capture the cursor using the [layer-shell protocol](https://wayland.app/protocols/wlr-layer-shell-unstable-v1).
-- `libei`: This backend uses [libei](https://gitlab.freedesktop.org/libinput/libei) and is supported by GNOME >= 45 or KDE Plasma >= 6.1.
-- `windows`: Backend for input capture on Windows.
-- `macos`: Backend for input capture on MacOS.
-- `x11`: TODO (not yet supported)
+- Lan Mouse: Ferdinand Schober e contribuidores.
+- Mousehop: Jon Kinney e contribuidores.
+- MonitorHop: contribuidores do MonitorHop.

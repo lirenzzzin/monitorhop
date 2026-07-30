@@ -1,0 +1,17 @@
+[package]
+name = "monitorhop-ipc"
+description = "library for communication between monitorhop service and frontends"
+version.workspace = true
+edition = "2021"
+license = "GPL-3.0-or-later"
+repository = "https://github.com/lirenzzzin/monitorhop"
+
+[dependencies]
+futures = "0.3.30"
+input-event = { workspace = true, default-features = false }
+log = "0.4.22"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.107"
+thiserror = "2.0.0"
+tokio = { version = "1.32.0", features = ["macros", "net", "io-util", "time"] }
+tokio-stream = { version = "0.1.15", features = ["io-util"] }

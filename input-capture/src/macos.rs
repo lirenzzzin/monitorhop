@@ -459,7 +459,7 @@ fn get_events(
             //
             //   1. Classic was the canonical scroll convention when
             //      the scroll wheel was invented; using it as the
-            //      wire format keeps Mousehop predictable for any
+            //      wire format keeps MonitorHop predictable for any
             //      receiver, including non-natural-aware peers.
             //   2. Receivers opt into natural-feel via their own
             //      `natural_scroll` config, mirroring how libinput's
@@ -820,7 +820,7 @@ fn event_tap_thread(
     // secure event input, which disables our session event tap.
     // macOS never re-enables it on unlock — without this observer
     // the daemon survives the lock but the tap stays dead and
-    // mousehop silently stops capturing. Box-leak the refcon so the
+    // monitorhop silently stops capturing. Box-leak the refcon so the
     // C side has a stable observer pointer; reclaim it after the run
     // loop exits.
     let unlock_ctx = Box::into_raw(Box::new(UnlockObserverCtx {
@@ -1203,7 +1203,7 @@ fn request_macos_capture_permissions() -> Result<(), MacosCaptureCreationError> 
 
 fn request_accessibility_permission() -> bool {
     // Silent check. The GUI owns the one-time user-visible prompt at
-    // startup (see mousehop_gtk::macos_privacy) so retries triggered by
+    // startup (see monitorhop_gtk::macos_privacy) so retries triggered by
     // clicking the "Reenable" button don't pop a fresh Accessibility
     // alert every time.
     unsafe { AXIsProcessTrusted() }

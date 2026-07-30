@@ -1,6 +1,6 @@
 use arboard::Clipboard;
 use input_event::{ClipboardEvent, Event};
-use mousehop_ipc::AppIdent;
+use monitorhop_ipc::AppIdent;
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};

@@ -1,10 +1,10 @@
 [package]
-name = "mousehop-input-event"
+name = "monitorhop-input-event"
 description = "cross-platform input-event types for input-capture / input-emulation"
 version.workspace = true
 edition = "2021"
 license = "GPL-3.0-or-later"
-repository = "https://github.com/jondkinney/mousehop"
+repository = "https://github.com/lirenzzzin/monitorhop"
 
 [dependencies]
 futures-core = "0.3.30"

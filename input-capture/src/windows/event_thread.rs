@@ -212,7 +212,7 @@ fn start_routine(
     let window_class: WNDCLASSW = WNDCLASSW {
         lpfnWndProc: window_proc,
         hInstance: instance,
-        lpszClassName: w!("mousehop-message-window-class"),
+        lpszClassName: w!("monitorhop-message-window-class"),
         ..Default::default()
     };
 
@@ -236,8 +236,8 @@ fn start_routine(
     let msg_window = unsafe {
         CreateWindowExW(
             Default::default(),
-            w!("mousehop-message-window-class"),
-            w!("mousehop-msg-window"),
+            w!("monitorhop-message-window-class"),
+            w!("monitorhop-msg-window"),
             WINDOW_STYLE::default(),
             0,
             0,
@@ -450,7 +450,7 @@ unsafe extern "system" fn mouse_proc(ncode: i32, wparam: WPARAM, lparam: LPARAM)
         return LRESULT(1);
     };
 
-    /* convert to mousehop event */
+    /* convert to monitorhop event */
     let Some(pointer_event) = to_mouse_event(wparam, lparam) else {
         return LRESULT(1);
     };

@@ -42,7 +42,7 @@ use input_event::Event;
 use crate::CaptureEvent;
 
 use super::{
-    Capture as MousehopInputCapture, Position,
+    Capture as MonitorHopInputCapture, Position,
     error::{CaptureError, LibeiCaptureCreationError},
 };
 
@@ -187,7 +187,7 @@ async fn connect_to_eis(
     // create ei context
     let context = ei::Context::new(stream)?;
     let (conn, event_stream) = context
-        .handshake_tokio("com.mousehop.Mousehop", ContextType::Receiver)
+        .handshake_tokio("dev.monitorhop.MonitorHop", ContextType::Receiver)
         .await?;
 
     Ok((context, conn, event_stream))
@@ -575,7 +575,7 @@ async fn handle_ei_event(
 }
 
 #[async_trait]
-impl MousehopInputCapture for LibeiInputCapture {
+impl MonitorHopInputCapture for LibeiInputCapture {
     async fn create(&mut self, pos: Position) -> Result<(), CaptureError> {
         let _ = self
             .notify_capture

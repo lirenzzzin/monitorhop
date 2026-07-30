@@ -2245,8 +2245,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "mousehop"
-version = "0.14.2"
+name = "monitorhop"
+version = "0.1.0"
 dependencies = [
  "clap 4.6.0",
  "env_logger",
@@ -2258,13 +2258,13 @@ dependencies = [
  "local-channel",
  "log",
  "mdns-sd",
- "mousehop-cli",
- "mousehop-gtk",
- "mousehop-input-capture",
- "mousehop-input-emulation",
- "mousehop-input-event",
- "mousehop-ipc",
- "mousehop-proto",
+ "monitorhop-cli",
+ "monitorhop-gtk",
+ "monitorhop-input-capture",
+ "monitorhop-input-emulation",
+ "monitorhop-input-event",
+ "monitorhop-ipc",
+ "monitorhop-proto",
  "netdev",
  "notify",
  "rcgen",
@@ -2284,19 +2284,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "mousehop-cli"
-version = "0.14.2"
+name = "monitorhop-cli"
+version = "0.1.0"
 dependencies = [
  "clap 4.6.0",
  "futures",
- "mousehop-ipc",
+ "monitorhop-ipc",
  "thiserror 2.0.18",
  "tokio",
 ]
 
 [[package]]
-name = "mousehop-gtk"
-version = "0.14.2"
+name = "monitorhop-gtk"
+version = "0.1.0"
 dependencies = [
  "async-channel",
  "glib-build-tools",
@@ -2305,15 +2305,15 @@ dependencies = [
  "ksni",
  "libadwaita",
  "log",
- "mousehop-input-capture",
- "mousehop-input-event",
- "mousehop-ipc",
+ "monitorhop-input-capture",
+ "monitorhop-input-event",
+ "monitorhop-ipc",
  "thiserror 2.0.18",
 ]
 
 [[package]]
-name = "mousehop-input-capture"
-version = "0.14.2"
+name = "monitorhop-input-capture"
+version = "0.1.0"
 dependencies = [
  "arboard",
  "ashpd",
@@ -2328,8 +2328,8 @@ dependencies = [
  "libc",
  "log",
  "memmap",
- "mousehop-input-event",
- "mousehop-ipc",
+ "monitorhop-input-event",
+ "monitorhop-ipc",
  "objc2",
  "objc2-app-kit",
  "objc2-foundation",
@@ -2349,8 +2349,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "mousehop-input-emulation"
-version = "0.14.2"
+name = "monitorhop-input-emulation"
+version = "0.1.0"
 dependencies = [
  "arboard",
  "ashpd",
@@ -2362,7 +2362,7 @@ dependencies = [
  "futures",
  "keycode",
  "log",
- "mousehop-input-event",
+ "monitorhop-input-event",
  "once_cell",
  "reis",
  "thiserror 2.0.18",
@@ -2376,8 +2376,8 @@ dependencies = [
 ]
 
 [[package]]
-name = "mousehop-input-event"
-version = "0.14.2"
+name = "monitorhop-input-event"
+version = "0.1.0"
 dependencies = [
  "futures-core",
  "log",
@@ -2388,12 +2388,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "mousehop-ipc"
-version = "0.14.2"
+name = "monitorhop-ipc"
+version = "0.1.0"
 dependencies = [
  "futures",
  "log",
- "mousehop-input-event",
+ "monitorhop-input-event",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -2402,12 +2402,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "mousehop-proto"
-version = "0.14.2"
+name = "monitorhop-proto"
+version = "0.1.0"
 dependencies = [
- "mousehop-input-event",
+ "monitorhop-input-event",
  "num_enum",
  "paste",
+ "sha2",
  "thiserror 2.0.18",
 ]
 

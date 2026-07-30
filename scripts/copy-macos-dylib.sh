@@ -2,7 +2,7 @@
 set -eu
 
 homebrew_path=""
-exec_path="target/debug/bundle/osx/Mousehop.app/Contents/MacOS/mousehop"
+exec_path="target/debug/bundle/osx/MonitorHop.app/Contents/MacOS/monitorhop"
 
 usage() {
     cat <<EOF

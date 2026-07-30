@@ -8,8 +8,9 @@ port = 4252
 
 # list of authorized tls certificate fingerprints that
 # are accepted for incoming traffic
-[authorized_fingerprints]
-"bc:05:ab:7a:a4:de:88:8c:2f:92:ac:bc:b8:49:b8:24:0d:44:b3:e6:a4:ef:d7:0b:6c:69:6d:77:53:0b:14:80" = "iridium"
+[authorized_fingerprints."bc:05:ab:7a:a4:de:88:8c:2f:92:ac:bc:b8:49:b8:24:0d:44:b3:e6:a4:ef:d7:0b:6c:69:6d:77:53:0b:14:80"]
+description = "iridium"
+clipboard_receive = true
 
 # define a client on the right side with host name "iridium"
 [[clients]]
@@ -17,8 +18,10 @@ port = 4252
 position = "right"
 # hostname
 hostname = "iridium"
-# activate this client immediately when mousehop is started
+# activate this client immediately when monitorhop is started
 activate_on_startup = true
+# explicitly allow clipboard text to flow to this peer
+clipboard_send = true
 # optional list of (known) ip addresses
 ips = ["192.168.178.156"]
 

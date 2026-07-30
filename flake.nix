@@ -1,5 +1,5 @@
 {
-  description = "Nix Flake for mousehop";
+  description = "Nix Flake for monitorhop";
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
     rust-overlay = {
@@ -60,11 +60,11 @@
             cargo = rustToolchainForBuild;
             rustc = rustToolchainForBuild;
           };
-          mousehop = pkgs.callPackage ./nix { rustPlatform = customRustPlatform; };
+          monitorhop = pkgs.callPackage ./nix { rustPlatform = customRustPlatform; };
         in
         {
-          default = mousehop;
-          inherit mousehop;
+          default = monitorhop;
+          inherit monitorhop;
         }
       );
       devShells = forEachPkgs (

@@ -40,7 +40,7 @@ const DOUBLE_CLICK_INTERVAL: Duration = Duration::from_millis(500);
 /// Reads this Mac's keyboard repeat settings and returns them as
 /// `(initial_delay, repeat_interval)`.
 ///
-/// Synthetic `CGEvent`s posted by mousehop do **not** auto-repeat the
+/// Synthetic `CGEvent`s posted by monitorhop do **not** auto-repeat the
 /// way a physically held key does — macOS only generates auto-repeat
 /// for real HID input — so this sink synthesizes the repeat stream
 /// itself. Reading the host's own `InitialKeyRepeat` / `KeyRepeat`
@@ -55,7 +55,7 @@ const DOUBLE_CLICK_INTERVAL: Duration = Duration::from_millis(500);
 /// value, which naturally yields an effectively infinite delay (a
 /// single press, no repeat). A missing key falls back to the
 /// `DEFAULT_*` constants above. We re-read on every press so changing
-/// the sliders takes effect without restarting mousehop.
+/// the sliders takes effect without restarting monitorhop.
 fn read_key_repeat_prefs() -> (Duration, Duration) {
     let initial = read_global_int_pref("InitialKeyRepeat")
         .map(ticks_to_duration)
@@ -177,7 +177,7 @@ impl MacOSEmulation {
     /// `Cell` and pass it back in. Required because plain
     /// `CGEventPost` doesn't trigger display wake on its own.
     fn declare_user_activity(&self) {
-        let cstr = match CString::new("Mousehop: remote input") {
+        let cstr = match CString::new("MonitorHop: remote input") {
             Ok(c) => c,
             Err(_) => return,
         };
@@ -264,7 +264,7 @@ fn request_macos_emulation_permissions() -> Result<(), MacOSEmulationCreationErr
 
 fn request_accessibility_permission() -> bool {
     // Silent check. The GUI owns the one-time user-visible prompt at
-    // startup (see mousehop_gtk::macos_privacy).
+    // startup (see monitorhop_gtk::macos_privacy).
     unsafe { AXIsProcessTrusted() }
 }
 
