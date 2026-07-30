@@ -79,8 +79,8 @@ jobs:
         id: cache
         with:
           path: c:/gtk-build/gtk/x64/release/**
-          key: gtk-windows-build
-          restore-keys: gtk-windows-build
+          key: gtk-windows-vs18-build
+          restore-keys: gtk-windows-vs18-build
       - name: Windows - update PATH
         if: runner.os == 'Windows'
         run: |
@@ -93,7 +93,9 @@ jobs:
           py -m venv .venv
           .venv\Scripts\activate.ps1
           py -m pip install gvsbuild
-          gvsbuild build --msys-dir=C:\msys64 gtk4 libadwaita librsvg
+          # windows-latest now ships Visual Studio 2026 (major 18).
+          # gvsbuild otherwise defaults to VS 2022 and rejects the runner.
+          gvsbuild build --vs-ver 18 --msys-dir=C:\msys64 gtk4 libadwaita librsvg
 
       - name: cargo clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
