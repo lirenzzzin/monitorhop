@@ -67,9 +67,9 @@ struct ConfigToml {
     emulation_backend: Option<EmulationBackend>,
     port: Option<u16>,
     release_bind: Option<Vec<scancode::Linux>>,
-    /// pixel threshold for the wall-press auto-release fallback.
-    /// 0 (or absent) disables it; the cursor only releases on the
-    /// release-bind chord or a peer-side `Leave`.
+    /// Pixel threshold for the wall-press auto-release fallback.
+    /// `0` explicitly disables it. Absent uses the safe default so
+    /// receive-only X11 peers can return control to the host.
     release_threshold_px: Option<u32>,
     /// Advertise (and consume) `_monitorhop._udp.local.` Bonjour
     /// service records. The TXT record's `primary=` field tells the
@@ -588,12 +588,12 @@ impl Config {
     }
 
     /// Pixel threshold for the wall-press auto-release fallback.
-    /// 0 disables it.
+    /// 0 disables it; new configurations default to 50 px.
     pub fn release_threshold_px(&self) -> u32 {
         self.config_toml
             .as_ref()
             .and_then(|c| c.release_threshold_px)
-            .unwrap_or(0)
+            .unwrap_or(50)
     }
 
     pub fn set_release_threshold_px(&mut self, threshold: u32) {

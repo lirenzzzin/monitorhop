@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.1 - 2026-07-30
+
+- Ativa por padrão o auto-release de 50 px para o cursor conseguir retornar de
+  clientes X11 que não oferecem captura de borda.
+- Corrige o CI do Windows para os runners com Visual Studio 2026.
+
 ## 0.1.0 - 2026-07-30
 
 Primeira versão do MonitorHop.

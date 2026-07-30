@@ -12,16 +12,16 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 
 [workspace.dependencies]
-input-event = { package = "monitorhop-input-event", path = "input-event", version = "0.1.0", default-features = false }
-input-capture = { package = "monitorhop-input-capture", path = "input-capture", version = "0.1.0", default-features = false }
-input-emulation = { package = "monitorhop-input-emulation", path = "input-emulation", version = "0.1.0", default-features = false }
-monitorhop-proto = { path = "monitorhop-proto", version = "0.1.0" }
-monitorhop-ipc = { path = "monitorhop-ipc", version = "0.1.0" }
-monitorhop-cli = { path = "monitorhop-cli", version = "0.1.0" }
-monitorhop-gtk = { path = "monitorhop-gtk", version = "0.1.0" }
+input-event = { package = "monitorhop-input-event", path = "input-event", version = "0.1.1", default-features = false }
+input-capture = { package = "monitorhop-input-capture", path = "input-capture", version = "0.1.1", default-features = false }
+input-emulation = { package = "monitorhop-input-emulation", path = "input-emulation", version = "0.1.1", default-features = false }
+monitorhop-proto = { path = "monitorhop-proto", version = "0.1.1" }
+monitorhop-ipc = { path = "monitorhop-ipc", version = "0.1.1" }
+monitorhop-cli = { path = "monitorhop-cli", version = "0.1.1" }
+monitorhop-gtk = { path = "monitorhop-gtk", version = "0.1.1" }
 
 [profile.release]
 codegen-units = 1

@@ -83,6 +83,7 @@ Exemplo reduzido:
 
 ```toml
 port = 4252
+release_threshold_px = 50
 
 [authorized_fingerprints."fingerprint-do-peer"]
 description = "notebook"
@@ -95,6 +96,13 @@ position = "left"
 activate_on_startup = true
 clipboard_send = true
 ```
+
+`release_threshold_px = 50` devolve o cursor ao computador de origem quando
+você o empurra contra a borda de retorno. O valor é o padrão do MonitorHop e é
+especialmente importante quando o destino usa X11, que nesta versão recebe
+mouse e teclado, mas não possui captura de borda própria. Use `0` para
+desativar e depender apenas do atalho de liberação ou do evento enviado pelo
+peer.
 
 ## Como o clipboard confiável funciona
 
