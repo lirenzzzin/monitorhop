@@ -53,6 +53,11 @@ pub enum KeyboardEvent {
 pub enum ClipboardEvent {
     /// text content from clipboard
     Text(String),
+    /// PNG-encoded image content from clipboard.
+    ImagePng(Vec<u8>),
+    /// Local file URIs from the system clipboard. The transfer layer
+    /// copies the referenced bytes before publishing them on the peer.
+    Files(Vec<String>),
 }
 
 #[derive(PartialEq, Debug, Clone)]
@@ -143,6 +148,12 @@ impl Display for ClipboardEvent {
                     text.clone()
                 };
                 write!(f, "clipboard(text: {preview})")
+            }
+            ClipboardEvent::ImagePng(png) => {
+                write!(f, "clipboard(image/png: {} bytes)", png.len())
+            }
+            ClipboardEvent::Files(files) => {
+                write!(f, "clipboard(files: {} entries)", files.len())
             }
         }
     }

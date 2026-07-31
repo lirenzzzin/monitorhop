@@ -1,4 +1,4 @@
-use arboard::Clipboard;
+use clipboard_rs::{Clipboard, ClipboardContext, common::RustImage};
 use input_event::ClipboardEvent;
 use std::sync::{Arc, Mutex};
 use thiserror::Error;
@@ -12,17 +12,16 @@ pub enum ClipboardError {
     Set(String),
 }
 
-/// Clipboard emulation that sets clipboard content
+/// Clipboard emulation that publishes text, PNG images, or native file URI
+/// lists. The platform library owns the X11/Wayland/Windows/macOS details.
 #[derive(Clone)]
 pub struct ClipboardEmulation {
-    // Use Arc<Mutex<>> to share clipboard across threads
-    clipboard: Arc<Mutex<Option<Clipboard>>>,
+    clipboard: Arc<Mutex<Option<ClipboardContext>>>,
 }
 
 impl ClipboardEmulation {
     pub fn new() -> Result<Self, ClipboardError> {
-        // Try to create initial clipboard instance
-        let clipboard = match Clipboard::new() {
+        let clipboard = match ClipboardContext::new() {
             Ok(c) => Some(c),
             Err(e) => {
                 log::warn!("Failed to create clipboard instance: {e}");
@@ -35,64 +34,57 @@ impl ClipboardEmulation {
         })
     }
 
-    /// Set clipboard content from a clipboard event
+    /// Set clipboard content from a validated clipboard event.
     pub async fn set(&self, event: ClipboardEvent) -> Result<(), ClipboardError> {
-        match event {
-            ClipboardEvent::Text(text) => {
-                let clipboard_arc = self.clipboard.clone();
+        let clipboard_arc = self.clipboard.clone();
 
-                spawn_blocking(move || {
-                    let mut clipboard_guard = clipboard_arc.lock().unwrap();
+        spawn_blocking(move || {
+            let mut clipboard_guard = clipboard_arc.lock().unwrap();
+            let clipboard = match clipboard_guard.as_mut() {
+                Some(c) => c,
+                None => {
+                    let c = ClipboardContext::new()
+                        .map_err(|e| ClipboardError::Access(format!("{e}")))?;
+                    *clipboard_guard = Some(c);
+                    clipboard_guard.as_mut().expect("clipboard inserted")
+                }
+            };
 
-                    // Try to get or create clipboard
-                    let clipboard = match clipboard_guard.as_mut() {
-                        Some(c) => c,
-                        None => {
-                            // Try to create a new clipboard instance
-                            match Clipboard::new() {
-                                Ok(c) => {
-                                    *clipboard_guard = Some(c);
-                                    clipboard_guard.as_mut().unwrap()
-                                }
-                                Err(e) => {
-                                    return Err(ClipboardError::Access(format!("{e}")));
-                                }
-                            }
-                        }
-                    };
-
-                    // Set clipboard text
-                    clipboard
-                        .set_text(text.clone())
+            match event {
+                ClipboardEvent::Text(text) => clipboard
+                    .set_text(text)
+                    .map_err(|e| ClipboardError::Set(format!("{e}")))?,
+                ClipboardEvent::ImagePng(png) => {
+                    let image = clipboard_rs::common::RustImageData::from_bytes(&png)
                         .map_err(|e| ClipboardError::Set(format!("{e}")))?;
-
-                    log::debug!("Clipboard set, length: {} bytes", text.len());
-                    Ok(())
-                })
-                .await
-                .map_err(|e| ClipboardError::Access(format!("Task join error: {e}")))?
+                    clipboard
+                        .set_image(image)
+                        .map_err(|e| ClipboardError::Set(format!("{e}")))?;
+                }
+                ClipboardEvent::Files(files) => clipboard
+                    .set_files(files)
+                    .map_err(|e| ClipboardError::Set(format!("{e}")))?,
             }
-        }
+            Ok(())
+        })
+        .await
+        .map_err(|e| ClipboardError::Access(format!("Task join error: {e}")))?
     }
 
-    /// Get current clipboard content (for testing/verification)
+    /// Get current clipboard text for diagnostics and legacy tests.
     pub async fn get(&self) -> Result<String, ClipboardError> {
         let clipboard_arc = self.clipboard.clone();
 
         spawn_blocking(move || {
             let mut clipboard_guard = clipboard_arc.lock().unwrap();
-
             let clipboard = match clipboard_guard.as_mut() {
                 Some(c) => c,
-                None => match Clipboard::new() {
-                    Ok(c) => {
-                        *clipboard_guard = Some(c);
-                        clipboard_guard.as_mut().unwrap()
-                    }
-                    Err(e) => {
-                        return Err(ClipboardError::Access(format!("{e}")));
-                    }
-                },
+                None => {
+                    let c = ClipboardContext::new()
+                        .map_err(|e| ClipboardError::Access(format!("{e}")))?;
+                    *clipboard_guard = Some(c);
+                    clipboard_guard.as_mut().expect("clipboard inserted")
+                }
             };
 
             clipboard

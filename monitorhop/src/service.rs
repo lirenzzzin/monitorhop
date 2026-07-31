@@ -1,6 +1,7 @@
 use crate::{
     capture::{Capture, CaptureType, ICaptureEvent},
     client::ClientManager,
+    clipboard_files,
     config::{Config, ConfigClient},
     connect::MonitorHopConnection,
     crypto,
@@ -21,7 +22,7 @@ use monitorhop_ipc::{
     AppIdent, AsyncFrontendListener, ClientHandle, ConnectionMode, FrontendEvent, FrontendRequest,
     HostKind, IncomingPeerConfig, IpcError, IpcListenerCreationError, Position, Status,
 };
-use monitorhop_proto::ProtoEvent;
+use monitorhop_proto::ClipboardKind;
 use std::{
     collections::{HashMap, HashSet, VecDeque},
     hash::{DefaultHasher, Hash, Hasher},
@@ -136,10 +137,21 @@ const FASTEST_UPGRADE_STREAK: u8 = 3;
 
 const RECENT_FORWARD_TTL: Duration = Duration::from_secs(1);
 
-fn clipboard_hash(content: &str) -> u64 {
+fn clipboard_hash(kind: ClipboardKind, content: &[u8]) -> u64 {
     let mut hasher = DefaultHasher::new();
+    kind.hash(&mut hasher);
     content.hash(&mut hasher);
     hasher.finish()
+}
+
+fn clipboard_payload(event: &ClipboardEvent) -> Result<(ClipboardKind, Vec<u8>), String> {
+    match event {
+        ClipboardEvent::Text(content) => Ok((ClipboardKind::Text, content.as_bytes().to_vec())),
+        ClipboardEvent::ImagePng(content) => Ok((ClipboardKind::ImagePng, content.clone())),
+        ClipboardEvent::Files(files) => clipboard_files::build_archive(files)
+            .map(|archive| (ClipboardKind::FilesArchive, archive))
+            .map_err(|e| e.to_string()),
+    }
 }
 
 #[derive(Debug)]
@@ -744,38 +756,39 @@ impl Service {
         let Some(event) = event else {
             return;
         };
-        let input_capture::CaptureEvent::Input(InputEvent::Clipboard(ClipboardEvent::Text(
-            content,
-        ))) = event
-        else {
+        let input_capture::CaptureEvent::Input(InputEvent::Clipboard(content)) = event else {
             return;
         };
         let targets = self.client_manager.clipboard_send_targets();
         if targets.is_empty() {
             log::trace!(
-                "clipboard captured locally ({} bytes) but no peer has clipboard_send=true; skipping fan-out",
-                content.len()
+                "clipboard captured locally ({content}) but no peer has clipboard_send=true; skipping fan-out"
             );
             return;
         }
+        let Ok((kind, payload)) = clipboard_payload(&content) else {
+            log::warn!("not forwarding clipboard payload: local files are unavailable or unsafe");
+            return;
+        };
         let from_fingerprint = self.public_key_fingerprint.clone();
-        let hash = clipboard_hash(&content);
+        let hash = clipboard_hash(kind, &payload);
         self.prune_recent_forwarded();
         self.recent_forwarded
             .insert((from_fingerprint.clone(), hash), Instant::now());
         log::info!(
-            "broadcasting local clipboard ({} bytes) to {} peer(s)",
-            content.len(),
+            "broadcasting local {content} ({} bytes) to {} peer(s)",
+            payload.len(),
             targets.len()
         );
         for handle in targets {
-            let event = ProtoEvent::Clipboard {
-                from_fingerprint: from_fingerprint.clone(),
-                content: content.clone(),
-            };
+            let payload = payload.clone();
+            let from_fingerprint = from_fingerprint.clone();
             let conn = self.conn.sender_clone();
             tokio::task::spawn_local(async move {
-                if let Err(e) = conn.send(event, handle).await {
+                if let Err(e) = conn
+                    .send_clipboard_payload(kind, &from_fingerprint, &payload, handle)
+                    .await
+                {
                     log::debug!("clipboard send to client {handle} failed: {e}");
                 }
             });
@@ -793,19 +806,23 @@ impl Service {
         &mut self,
         from_addr: SocketAddr,
         from_fingerprint: String,
-        content: String,
+        content: ClipboardEvent,
     ) {
         if let Some(monitor) = self.clipboard_monitor.as_ref() {
-            monitor.update_last_content(content.clone());
+            monitor.update_last_event(&content);
         }
-        let hash = clipboard_hash(&content);
+        let Ok((kind, payload)) = clipboard_payload(&content) else {
+            log::warn!("not forwarding received clipboard payload: staged files are unavailable");
+            return;
+        };
+        let hash = clipboard_hash(kind, &payload);
         self.prune_recent_forwarded();
         let key = (from_fingerprint.clone(), hash);
         if self.recent_forwarded.contains_key(&key) {
             log::debug!(
                 "skipping clipboard re-fan-out: already forwarded ({}, {} bytes) within {}ms",
                 &from_fingerprint[..from_fingerprint.len().min(8)],
-                content.len(),
+                payload.len(),
                 RECENT_FORWARD_TTL.as_millis()
             );
             return;
@@ -831,18 +848,19 @@ impl Service {
         self.recent_forwarded.insert(key, Instant::now());
         log::info!(
             "forwarding clipboard ({} bytes, originator {}) to {} peer(s)",
-            content.len(),
+            payload.len(),
             &from_fingerprint[..from_fingerprint.len().min(8)],
             forward_targets.len()
         );
         for handle in forward_targets {
-            let event = ProtoEvent::Clipboard {
-                from_fingerprint: from_fingerprint.clone(),
-                content: content.clone(),
-            };
+            let payload = payload.clone();
+            let from_fingerprint = from_fingerprint.clone();
             let conn = self.conn.sender_clone();
             tokio::task::spawn_local(async move {
-                if let Err(e) = conn.send(event, handle).await {
+                if let Err(e) = conn
+                    .send_clipboard_payload(kind, &from_fingerprint, &payload, handle)
+                    .await
+                {
                     log::debug!("clipboard forward to client {handle} failed: {e}");
                 }
             });
@@ -1302,15 +1320,21 @@ mod tests {
 
     #[test]
     fn clipboard_hash_is_deterministic_within_run() {
-        let h1 = clipboard_hash("hello, world");
-        let h2 = clipboard_hash("hello, world");
+        let h1 = clipboard_hash(ClipboardKind::Text, b"hello, world");
+        let h2 = clipboard_hash(ClipboardKind::Text, b"hello, world");
         assert_eq!(h1, h2);
     }
 
     #[test]
     fn clipboard_hash_distinguishes_different_inputs() {
-        assert_ne!(clipboard_hash("foo"), clipboard_hash("bar"));
-        assert_ne!(clipboard_hash(""), clipboard_hash("\0"));
+        assert_ne!(
+            clipboard_hash(ClipboardKind::Text, b"foo"),
+            clipboard_hash(ClipboardKind::Text, b"bar")
+        );
+        assert_ne!(
+            clipboard_hash(ClipboardKind::Text, b""),
+            clipboard_hash(ClipboardKind::Text, b"\0")
+        );
     }
 
     #[test]

@@ -76,3 +76,19 @@ ACK.
 4. Cole no PC.
 5. Copie um texto maior que 4 KiB para validar o protocolo fragmentado.
 6. Atravesse o cursor pela borda esquerda do monitor principal.
+
+## Clipboard rico
+
+Com `clipboard_send = true` e `clipboard_receive = true`, o MonitorHop
+também sincroniza:
+
+- imagens PNG (incluindo screenshots: `Print Screen` no notebook e `Ctrl+V`
+  no PC);
+- seleções de arquivos e diretórios do gerenciador de arquivos.
+
+Arquivos são copiados, não movidos: o peer cria uma cópia em
+`~/.cache/monitorhop/clipboard/` e publica os URIs locais no clipboard. Para
+evitar travamentos e abuso de memória, cada transferência binária tem limite
+de 64 MiB; symlinks, arquivos especiais, URIs remotos e caminhos com `..` são
+recusados. O protocolo valida tamanho, ordem e SHA-256 antes de tocar no
+clipboard.

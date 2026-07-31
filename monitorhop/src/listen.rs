@@ -2,7 +2,7 @@ use futures::{Stream, StreamExt};
 use local_channel::mpsc::{Receiver, Sender, channel};
 use monitorhop_ipc::IncomingPeerConfig;
 use monitorhop_proto::{
-    ClipboardAssembler, ClipboardFrame, MAX_CLIPBOARD_DATAGRAM_SIZE, MAX_EVENT_SIZE,
+    ClipboardAssembler, ClipboardFrame, ClipboardKind, MAX_CLIPBOARD_DATAGRAM_SIZE, MAX_EVENT_SIZE,
     PROTOCOL_MAGIC, ProtoEvent, decode_clipboard_frame, encode_clipboard_frame,
 };
 use rustls::pki_types::CertificateDer;
@@ -52,7 +52,8 @@ pub(crate) enum ListenEvent {
         addr: SocketAddr,
         transfer_id: u64,
         from_fingerprint: String,
-        content: String,
+        kind: ClipboardKind,
+        content: Vec<u8>,
         content_hash: [u8; 32],
     },
     Accept {
@@ -727,6 +728,7 @@ async fn read_loop(
                             addr,
                             transfer_id: transfer.transfer_id,
                             from_fingerprint: transfer.from_fingerprint,
+                            kind: transfer.kind,
                             content: transfer.content,
                             content_hash: transfer.content_hash,
                         })

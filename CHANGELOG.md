@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.3 - 2026-07-30
+
+- Sincroniza texto, imagens PNG e seleções de arquivos/diretórios pelo
+  clipboard autenticado.
+- Copiar arquivos cria uma cópia local no peer; symlinks, arquivos especiais,
+  URIs remotos e caminhos inseguros são recusados.
+- Valida tamanho, fragmentação, SHA-256 e ACK antes de publicar o conteúdo no
+  clipboard; payloads binários têm limite de 64 MiB.
+- Atualiza o magic do protocolo para impedir interop silenciosa com versões
+  anteriores.
+
 ## 0.1.2 - 2026-07-30
 
 - Faz o teclado seguir o `Begin` do cursor imediatamente, sem aguardar o ACK

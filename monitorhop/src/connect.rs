@@ -4,8 +4,8 @@ use crate::discovery::{PrimaryCache, normalize_mdns_name};
 use local_channel::mpsc::{Receiver, Sender, channel};
 use monitorhop_ipc::{ClientHandle, ConnectionMode, DEFAULT_PORT};
 use monitorhop_proto::{
-    ClipboardFrame, MAX_CLIPBOARD_DATAGRAM_SIZE, MAX_EVENT_SIZE, PROTOCOL_MAGIC, ProtoEvent,
-    decode_clipboard_frame, encode_clipboard_transfer,
+    ClipboardFrame, ClipboardKind, MAX_CLIPBOARD_DATAGRAM_SIZE, MAX_EVENT_SIZE, PROTOCOL_MAGIC,
+    ProtoEvent, decode_clipboard_frame, encode_clipboard_payload, encode_clipboard_transfer,
 };
 use std::{
     cell::{Cell, RefCell},
@@ -323,7 +323,36 @@ impl MonitorHopConnection {
                 log::warn!("unable to encode clipboard transfer for client {handle}: {e}");
                 MonitorHopConnectionError::ClipboardRejected
             })?;
+        self.send_clipboard_datagrams(handle, transfer_id, datagrams, expected_hash)
+            .await
+    }
 
+    pub(crate) async fn send_clipboard_payload(
+        &self,
+        kind: ClipboardKind,
+        from_fingerprint: &str,
+        content: &[u8],
+        handle: ClientHandle,
+    ) -> Result<(), MonitorHopConnectionError> {
+        let transfer_id = NEXT_CLIPBOARD_TRANSFER_ID.fetch_add(1, Ordering::Relaxed);
+        let (datagrams, expected_hash) =
+            encode_clipboard_payload(kind, from_fingerprint, content, transfer_id).map_err(
+                |e| {
+                    log::warn!("unable to encode clipboard transfer for client {handle}: {e}");
+                    MonitorHopConnectionError::ClipboardRejected
+                },
+            )?;
+        self.send_clipboard_datagrams(handle, transfer_id, datagrams, expected_hash)
+            .await
+    }
+
+    async fn send_clipboard_datagrams(
+        &self,
+        handle: ClientHandle,
+        transfer_id: u64,
+        datagrams: Vec<Vec<u8>>,
+        expected_hash: [u8; 32],
+    ) -> Result<(), MonitorHopConnectionError> {
         // A copy may happen before this peer's lazy input connection has
         // been established. Trigger it and wait briefly instead of dropping
         // the clipboard update permanently.

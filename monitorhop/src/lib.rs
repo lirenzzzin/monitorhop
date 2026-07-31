@@ -1,6 +1,7 @@
 mod capture;
 pub mod capture_test;
 pub mod client;
+mod clipboard_files;
 pub mod config;
 mod connect;
 mod crypto;

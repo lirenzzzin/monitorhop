@@ -19,6 +19,10 @@ pub const MAX_EVENT_SIZE: usize = size_of::<u8>() + size_of::<u32>() + 2 * size_
 /// large multi-line documents do not depend on IP fragmentation.
 pub const MAX_CLIPBOARD_SIZE: usize = 2 * 1024 * 1024;
 
+/// Maximum total payload for binary clipboard transfers. The finite bound is
+/// checked before allocation so a peer cannot exhaust memory.
+pub const MAX_CLIPBOARD_TRANSFER_SIZE: usize = 64 * 1024 * 1024;
+
 /// Upper bound for an encoded clipboard protocol datagram.
 pub const MAX_CLIPBOARD_DATAGRAM_SIZE: usize = 1200;
 
@@ -28,6 +32,7 @@ pub const MAX_CLIPBOARD_DATAGRAM_SIZE: usize = 1200;
 pub const CLIPBOARD_CHUNK_SIZE: usize = 1120;
 
 const MAX_FINGERPRINT_SIZE: usize = 256;
+const MAX_PENDING_CLIPBOARD_TRANSFERS: usize = 4;
 
 /// 8-byte protocol magic identifying a monitorhop peer, carried in
 /// every [`ProtoEvent::Hello`]. The `Hello` is exchanged right after
@@ -36,7 +41,7 @@ const MAX_FINGERPRINT_SIZE: usize = 256;
 /// instance and has its connection refused. monitorhop is deliberately
 /// **not** wire-compatible with lan-mouse or any other fork — change
 /// this magic to force a hard break against a future divergence.
-pub const PROTOCOL_MAGIC: [u8; 8] = *b"MONHOP01";
+pub const PROTOCOL_MAGIC: [u8; 8] = *b"MONHOP02";
 
 /// error type for protocol violations
 #[derive(Debug, Error)]
@@ -56,6 +61,8 @@ pub enum ProtocolError {
     /// clipboard transfer metadata does not match the received chunks
     #[error("invalid clipboard transfer")]
     InvalidClipboardTransfer,
+    #[error("invalid clipboard payload kind")]
+    InvalidClipboardKind,
     /// clipboard transfer failed its SHA-256 integrity check
     #[error("clipboard integrity check failed")]
     ClipboardHashMismatch,
@@ -246,6 +253,15 @@ pub enum EventType {
     ClipboardAck,
 }
 
+/// Clipboard payload carried by the reliable datagram transfer.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, TryFromPrimitive, IntoPrimitive)]
+#[repr(u8)]
+pub enum ClipboardKind {
+    Text,
+    ImagePng,
+    FilesArchive,
+}
+
 impl ProtoEvent {
     /// Construct a [`ProtoEvent::Hello`] stamped with this build's
     /// [`PROTOCOL_MAGIC`] and the given short commit hash.
@@ -270,7 +286,9 @@ impl ProtoEvent {
                     KeyboardEvent::Modifiers { .. } => EventType::KeyboardModifiers,
                 },
                 InputEvent::Clipboard(c) => match c {
-                    ClipboardEvent::Text(_) => EventType::Clipboard,
+                    ClipboardEvent::Text(_)
+                    | ClipboardEvent::ImagePng(_)
+                    | ClipboardEvent::Files(_) => EventType::Clipboard,
                 },
             },
             ProtoEvent::Ping => EventType::Ping,
@@ -530,6 +548,7 @@ pub enum ClipboardFrame {
     Begin {
         transfer_id: u64,
         from_fingerprint: String,
+        kind: ClipboardKind,
         content_len: u32,
         chunk_count: u32,
         content_hash: [u8; 32],
@@ -550,7 +569,8 @@ pub enum ClipboardFrame {
 pub struct ClipboardTransfer {
     pub transfer_id: u64,
     pub from_fingerprint: String,
-    pub content: String,
+    pub kind: ClipboardKind,
+    pub content: Vec<u8>,
     pub content_hash: [u8; 32],
 }
 
@@ -576,30 +596,45 @@ pub fn encode_clipboard_transfer(
         }
         _ => panic!("encode_clipboard_transfer called on non-clipboard event"),
     };
+    encode_clipboard_payload(
+        ClipboardKind::Text,
+        from_fingerprint,
+        content.as_bytes(),
+        transfer_id,
+    )
+}
+
+/// Encode a typed clipboard payload into MTU-safe datagrams.
+pub fn encode_clipboard_payload(
+    kind: ClipboardKind,
+    from_fingerprint: &str,
+    content: &[u8],
+    transfer_id: u64,
+) -> Result<(Vec<Vec<u8>>, [u8; 32]), ProtocolError> {
     let fp_bytes = from_fingerprint.as_bytes();
-    let text_bytes = content.as_bytes();
-    if fp_bytes.len() > MAX_FINGERPRINT_SIZE || text_bytes.len() > MAX_CLIPBOARD_SIZE {
-        return Err(ProtocolError::ClipboardTooLarge(text_bytes.len()));
+    if fp_bytes.len() > MAX_FINGERPRINT_SIZE || content.len() > max_clipboard_size(kind) {
+        return Err(ProtocolError::ClipboardTooLarge(content.len()));
     }
-    let content_hash: [u8; 32] = Sha256::digest(text_bytes).into();
-    let chunk_count = text_bytes.len().div_ceil(CLIPBOARD_CHUNK_SIZE).max(1) as u32;
+    let content_hash: [u8; 32] = Sha256::digest(content).into();
+    let chunk_count = content.len().div_ceil(CLIPBOARD_CHUNK_SIZE).max(1) as u32;
     let begin = ClipboardFrame::Begin {
         transfer_id,
         from_fingerprint: from_fingerprint.to_owned(),
-        content_len: text_bytes.len() as u32,
+        kind,
+        content_len: content.len() as u32,
         chunk_count,
         content_hash,
     };
     let mut datagrams = Vec::with_capacity(chunk_count as usize + 1);
     datagrams.push(encode_clipboard_frame(&begin)?);
-    if text_bytes.is_empty() {
+    if content.is_empty() {
         datagrams.push(encode_clipboard_frame(&ClipboardFrame::Chunk {
             transfer_id,
             index: 0,
             data: Vec::new(),
         })?);
     } else {
-        for (index, data) in text_bytes.chunks(CLIPBOARD_CHUNK_SIZE).enumerate() {
+        for (index, data) in content.chunks(CLIPBOARD_CHUNK_SIZE).enumerate() {
             datagrams.push(encode_clipboard_frame(&ClipboardFrame::Chunk {
                 transfer_id,
                 index: index as u32,
@@ -610,24 +645,33 @@ pub fn encode_clipboard_transfer(
     Ok((datagrams, content_hash))
 }
 
+fn max_clipboard_size(kind: ClipboardKind) -> usize {
+    match kind {
+        ClipboardKind::Text => MAX_CLIPBOARD_SIZE,
+        ClipboardKind::ImagePng | ClipboardKind::FilesArchive => MAX_CLIPBOARD_TRANSFER_SIZE,
+    }
+}
+
 pub fn encode_clipboard_frame(frame: &ClipboardFrame) -> Result<Vec<u8>, ProtocolError> {
     let mut buf = Vec::with_capacity(MAX_CLIPBOARD_DATAGRAM_SIZE);
     match frame {
         ClipboardFrame::Begin {
             transfer_id,
             from_fingerprint,
+            kind,
             content_len,
             chunk_count,
             content_hash,
         } => {
             let fingerprint = from_fingerprint.as_bytes();
             if fingerprint.len() > MAX_FINGERPRINT_SIZE
-                || *content_len as usize > MAX_CLIPBOARD_SIZE
+                || *content_len as usize > max_clipboard_size(*kind)
                 || *chunk_count == 0
             {
                 return Err(ProtocolError::InvalidClipboardTransfer);
             }
             buf.push(EventType::ClipboardBegin as u8);
+            buf.push((*kind).into());
             buf.extend_from_slice(&transfer_id.to_be_bytes());
             buf.extend_from_slice(&(fingerprint.len() as u16).to_be_bytes());
             buf.extend_from_slice(fingerprint);
@@ -674,6 +718,8 @@ pub fn decode_clipboard_frame(buf: &[u8]) -> Result<ClipboardFrame, ProtocolErro
     let event_type = EventType::try_from(buf[0])?;
     match event_type {
         EventType::ClipboardBegin => {
+            let kind = ClipboardKind::try_from(read_u8_slice(buf, &mut cursor)?)
+                .map_err(|_| ProtocolError::InvalidClipboardKind)?;
             let transfer_id = read_u64(buf, &mut cursor)?;
             let fp_len = read_u16(buf, &mut cursor)? as usize;
             if fp_len > MAX_FINGERPRINT_SIZE || buf.len() < cursor + fp_len {
@@ -684,7 +730,10 @@ pub fn decode_clipboard_frame(buf: &[u8]) -> Result<ClipboardFrame, ProtocolErro
             let content_len = read_u32(buf, &mut cursor)?;
             let chunk_count = read_u32(buf, &mut cursor)?;
             let content_hash = read_array::<32>(buf, &mut cursor)?;
-            if content_len as usize > MAX_CLIPBOARD_SIZE
+            if cursor != buf.len() {
+                return Err(ProtocolError::InvalidClipboardTransfer);
+            }
+            if content_len as usize > max_clipboard_size(kind)
                 || chunk_count == 0
                 || chunk_count as usize
                     != (content_len as usize).div_ceil(CLIPBOARD_CHUNK_SIZE).max(1)
@@ -694,6 +743,7 @@ pub fn decode_clipboard_frame(buf: &[u8]) -> Result<ClipboardFrame, ProtocolErro
             Ok(ClipboardFrame::Begin {
                 transfer_id,
                 from_fingerprint,
+                kind,
                 content_len,
                 chunk_count,
                 content_hash,
@@ -759,6 +809,7 @@ fn read_u64(buf: &[u8], cursor: &mut usize) -> Result<u64, ProtocolError> {
 #[derive(Debug)]
 struct PendingClipboard {
     from_fingerprint: String,
+    kind: ClipboardKind,
     content_len: usize,
     content_hash: [u8; 32],
     chunks: Vec<Option<Vec<u8>>>,
@@ -779,12 +830,19 @@ impl ClipboardAssembler {
             ClipboardFrame::Begin {
                 transfer_id,
                 from_fingerprint,
+                kind,
                 content_len,
                 chunk_count,
                 content_hash,
             } => {
+                if !self.pending.contains_key(&transfer_id)
+                    && self.pending.len() >= MAX_PENDING_CLIPBOARD_TRANSFERS
+                {
+                    return Err(ProtocolError::InvalidClipboardTransfer);
+                }
                 let pending = PendingClipboard {
                     from_fingerprint,
+                    kind,
                     content_len: content_len as usize,
                     content_hash,
                     chunks: vec![None; chunk_count as usize],
@@ -793,7 +851,8 @@ impl ClipboardAssembler {
                     Some(existing)
                         if existing.content_len == pending.content_len
                             && existing.content_hash == pending.content_hash
-                            && existing.from_fingerprint == pending.from_fingerprint =>
+                            && existing.from_fingerprint == pending.from_fingerprint
+                            && existing.kind == pending.kind =>
                     {
                         // Retransmitted begin frame: retain chunks already received.
                     }
@@ -836,12 +895,14 @@ impl ClipboardAssembler {
                     return Err(ProtocolError::ClipboardHashMismatch);
                 }
                 let from_fingerprint = pending.from_fingerprint.clone();
+                let kind = pending.kind;
                 let content_hash = pending.content_hash;
                 self.pending.remove(&transfer_id);
                 Ok(Some(ClipboardTransfer {
                     transfer_id,
                     from_fingerprint,
-                    content: String::from_utf8(bytes)?,
+                    kind,
+                    content: bytes,
                     content_hash,
                 }))
             }
@@ -875,7 +936,8 @@ mod tests {
         let transfer = transfer.expect("completed transfer");
         assert_eq!(transfer.transfer_id, 42);
         assert_eq!(transfer.from_fingerprint, "abcd1234");
-        assert_eq!(transfer.content, "hello, world");
+        assert_eq!(transfer.kind, ClipboardKind::Text);
+        assert_eq!(transfer.content, b"hello, world");
         assert_eq!(transfer.content_hash, hash);
     }
 
@@ -911,7 +973,26 @@ mod tests {
         for chunk in chunks {
             completed = assembler.push(chunk).expect("chunk accepted").or(completed);
         }
-        assert_eq!(completed.expect("complete").content, content);
+        assert_eq!(completed.expect("complete").content, content.as_bytes());
+    }
+
+    #[test]
+    fn binary_clipboard_round_trip_preserves_kind_and_bytes() {
+        let payload: Vec<u8> = (0..=255).cycle().take(10_000).collect();
+        let (datagrams, hash) =
+            encode_clipboard_payload(ClipboardKind::ImagePng, "fp", &payload, 8).expect("encode");
+        let mut assembler = ClipboardAssembler::default();
+        let mut complete = None;
+        for datagram in datagrams {
+            complete = assembler
+                .push(decode_clipboard_frame(&datagram).expect("decode"))
+                .expect("assemble")
+                .or(complete);
+        }
+        let complete = complete.expect("complete");
+        assert_eq!(complete.kind, ClipboardKind::ImagePng);
+        assert_eq!(complete.content, payload);
+        assert_eq!(complete.content_hash, hash);
     }
 
     #[test]

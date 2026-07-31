@@ -1,6 +1,7 @@
-use arboard::Clipboard;
+use clipboard_rs::{Clipboard, ClipboardContext, ContentFormat, common::RustImage};
 use input_event::{ClipboardEvent, Event};
 use monitorhop_ipc::AppIdent;
+use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -25,6 +26,7 @@ pub struct ClipboardMonitor {
     last_content: Arc<Mutex<Option<String>>>,
     last_change: Arc<Mutex<Option<Instant>>>,
     enabled: Arc<Mutex<bool>>,
+    _clipboard: Arc<Mutex<Option<ClipboardContext>>>,
 }
 
 impl ClipboardMonitor {
@@ -48,21 +50,27 @@ impl ClipboardMonitor {
         let last_content: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
         let last_change: Arc<Mutex<Option<Instant>>> = Arc::new(Mutex::new(None));
         let enabled = Arc::new(Mutex::new(true));
+        // clipboard-rs' X11 backend starts a selection-request worker when a
+        // context is created. Reusing one context is essential: constructing
+        // one on every poll leaks X11 connections and worker threads.
+        let clipboard = Arc::new(Mutex::new(match ClipboardContext::new() {
+            Ok(context) => Some(context),
+            Err(e) => {
+                log::warn!("clipboard monitoring unavailable: {e}");
+                None
+            }
+        }));
 
         let last_content_clone = last_content.clone();
         let last_change_clone = last_change.clone();
         let enabled_clone = enabled.clone();
         let event_tx_clone = event_tx.clone();
         let suppression_clone = suppression.clone();
+        let clipboard_clone = clipboard.clone();
 
-        // Spawn monitoring task. Cadence: 100 ms on macOS (cheap
-        // because `pasteboard_change_count_advanced` short-circuits
-        // 99% of ticks via a single integer compare); 500 ms
-        // elsewhere (no cheap precheck, full content read every
-        // tick). Tighter cadence on macOS shrinks the
-        // frontmost-app suppression race window from 500 ms →
-        // 100 ms — the user would have to Cmd+Tab faster than
-        // human reaction time after copying to defeat the check.
+        // Wayland has no clipboard-change notification protocol, so
+        // this remains a polling monitor. The payload read itself is
+        // blocking and always runs off the async task.
         #[cfg(target_os = "macos")]
         const POLL_MS: u64 = 100;
         #[cfg(not(target_os = "macos"))]
@@ -99,28 +107,17 @@ impl ClipboardMonitor {
                 let last_change_clone2 = last_change_clone.clone();
                 let event_tx_clone2 = event_tx_clone.clone();
                 let suppression_clone2 = suppression_clone.clone();
+                let clipboard_clone2 = clipboard_clone.clone();
 
                 let _ = spawn_blocking(move || {
-                    // Create clipboard instance
-                    let mut clipboard = match Clipboard::new() {
-                        Ok(c) => c,
-                        Err(e) => {
-                            log::debug!("Failed to create clipboard: {e}");
-                            return;
-                        }
+                    let clipboard_guard = clipboard_clone2.lock().unwrap();
+                    let Some(clipboard) = clipboard_guard.as_ref() else {
+                        return;
                     };
 
-                    // Get current clipboard text
-                    let current_text = match clipboard.get_text() {
-                        Ok(text) => {
-                            log::trace!("Clipboard text read: {} bytes", text.len());
-                            text
-                        }
-                        Err(e) => {
-                            // Clipboard might be empty or contain non-text data
-                            log::trace!("Failed to get clipboard text: {e}");
-                            return;
-                        }
+                    let Ok((event, identity)) = read_clipboard(clipboard) else {
+                        // Empty, unavailable, or unsupported clipboard.
+                        return;
                     };
 
                     // Check if content changed
@@ -135,7 +132,7 @@ impl ClipboardMonitor {
                     // Pre-compute the inputs here so the classifier
                     // stays a pure function.
                     let needs_decision = PollDecision::content_might_emit(
-                        &current_text,
+                        &identity,
                         last_content.as_deref(),
                         last_change_elapsed,
                     );
@@ -151,7 +148,7 @@ impl ClipboardMonitor {
                         (false, None)
                     };
                     let decision = PollDecision::classify(
-                        &current_text,
+                        &identity,
                         last_content.as_deref(),
                         last_change_elapsed,
                         concealed,
@@ -173,7 +170,7 @@ impl ClipboardMonitor {
                     // contract — see the unit tests at the
                     // bottom of this file.
                     if decision.advances_state() {
-                        *last_content = Some(current_text.clone());
+                        *last_content = Some(identity.clone());
                         *last_change = Some(Instant::now());
                     }
                     match decision {
@@ -193,10 +190,8 @@ impl ClipboardMonitor {
                             }
                         }
                         PollDecision::Emit => {
-                            log::info!("Clipboard changed, length: {} bytes", current_text.len());
-                            let event = CaptureEvent::Input(Event::Clipboard(
-                                ClipboardEvent::Text(current_text),
-                            ));
+                            log::info!("Clipboard changed: {event:?}");
+                            let event = CaptureEvent::Input(Event::Clipboard(event));
                             let _ = event_tx_clone2.blocking_send(event);
                         }
                     }
@@ -211,6 +206,7 @@ impl ClipboardMonitor {
             last_content,
             last_change,
             enabled,
+            _clipboard: clipboard,
         })
     }
 
@@ -236,10 +232,60 @@ impl ClipboardMonitor {
     /// Update the last known clipboard content (called when we set the clipboard)
     /// This prevents detecting our own clipboard changes as external changes
     pub fn update_last_content(&self, content: String) {
+        self.update_last_event(&ClipboardEvent::Text(content));
+    }
+
+    /// Update the last known clipboard payload after applying a forwarded
+    /// event. This suppresses local echoes for text, images, and files.
+    pub fn update_last_event(&self, event: &ClipboardEvent) {
         let mut last_content = self.last_content.lock().unwrap();
         let mut last_change = self.last_change.lock().unwrap();
-        *last_content = Some(content);
+        *last_content = Some(clipboard_identity(event));
         *last_change = Some(Instant::now());
+    }
+}
+
+/// Read the richest supported clipboard payload. File managers often expose
+/// both `text/uri-list` and text, so files must win over the text fallback.
+fn read_clipboard(clipboard: &ClipboardContext) -> Result<(ClipboardEvent, String), String> {
+    if clipboard.has(ContentFormat::Files) {
+        if let Ok(files) = clipboard.get_files() {
+            if !files.is_empty() {
+                let event = ClipboardEvent::Files(files);
+                return Ok((event.clone(), clipboard_identity(&event)));
+            }
+        }
+    }
+
+    if clipboard.has(ContentFormat::Image) {
+        if let Ok(image) = clipboard.get_image() {
+            if let Ok(png) = image.to_png() {
+                let event = ClipboardEvent::ImagePng(png.get_bytes().to_vec());
+                return Ok((event.clone(), clipboard_identity(&event)));
+            }
+        }
+    }
+
+    if clipboard.has(ContentFormat::Text) {
+        if let Ok(text) = clipboard.get_text() {
+            let event = ClipboardEvent::Text(text);
+            return Ok((event.clone(), clipboard_identity(&event)));
+        }
+    }
+
+    Err("clipboard has no supported text, image, or file payload".into())
+}
+
+/// Stable local identity used only for echo suppression. Binary payloads use
+/// SHA-256 so the monitor does not retain another full copy of large data.
+fn clipboard_identity(event: &ClipboardEvent) -> String {
+    match event {
+        ClipboardEvent::Text(text) => text.clone(),
+        ClipboardEvent::ImagePng(png) => format!("monitorhop:image:{:x}", Sha256::digest(png)),
+        ClipboardEvent::Files(files) => format!(
+            "monitorhop:files:{:x}",
+            Sha256::digest(files.join("\n").as_bytes())
+        ),
     }
 }
 
@@ -294,8 +340,8 @@ fn is_suppressed(list: &SuppressionList) -> Option<AppIdent> {
 /// Returns `true` the first time it's called, and on every later
 /// call where `NSPasteboard.generalPasteboard.changeCount` has
 /// advanced since the previous call. Used as a cheap precheck so
-/// the polling loop only invokes `arboard::Clipboard::get_text`
-/// (which round-trips through `pboardd` via XPC) on ticks where
+/// the polling loop only invokes the native clipboard read
+/// (which round-trips through the platform clipboard service) on ticks where
 /// the pasteboard actually mutated.
 ///
 /// `changeCount` reads are an Apple-blessed background-thread

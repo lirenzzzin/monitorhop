@@ -4,7 +4,7 @@ use std::{
     fmt::Display,
 };
 
-use input_event::{ClipboardEvent, Event, KeyboardEvent, PointerEvent};
+use input_event::{Event, KeyboardEvent, PointerEvent};
 
 use crate::clipboard::ClipboardEmulation;
 
@@ -191,9 +191,9 @@ impl InputEmulation {
         // keyboard pipeline. Per-backend `consume` impls treat
         // `Event::Clipboard` as a no-op, so handling it here keeps
         // the dispatch in one place.
-        if let Event::Clipboard(ClipboardEvent::Text(text)) = &event {
+        if let Event::Clipboard(clipboard_event) = &event {
             if let Some(clipboard) = self.clipboard.as_ref() {
-                if let Err(e) = clipboard.set(ClipboardEvent::Text(text.clone())).await {
+                if let Err(e) = clipboard.set(clipboard_event.clone()).await {
                     log::warn!("failed to set clipboard: {e}");
                 }
             }

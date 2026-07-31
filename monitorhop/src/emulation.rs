@@ -7,7 +7,7 @@ use input_emulation::{
 use input_event::{ClipboardEvent, Event};
 use local_channel::mpsc::{Receiver, Sender, channel};
 use monitorhop_ipc::IncomingPeerConfig;
-use monitorhop_proto::{Position, ProtoEvent};
+use monitorhop_proto::{ClipboardKind, Position, ProtoEvent};
 use std::{
     cell::Cell,
     collections::HashMap,
@@ -88,7 +88,7 @@ pub(crate) enum EmulationEvent {
     ClipboardReceived {
         addr: SocketAddr,
         from_fingerprint: String,
-        content: String,
+        content: ClipboardEvent,
     },
 }
 
@@ -293,7 +293,7 @@ impl ListenTask {
                                     self.event_tx.send(EmulationEvent::ClipboardReceived {
                                         addr,
                                         from_fingerprint,
-                                        content,
+                                        content: ClipboardEvent::Text(content),
                                     }).expect("channel closed");
                                 }
                             }
@@ -357,6 +357,7 @@ impl ListenTask {
                         addr,
                         transfer_id,
                         from_fingerprint,
+                        kind,
                         content,
                         content_hash,
                     }) => {
@@ -367,14 +368,33 @@ impl ListenTask {
                             .map(|peer| peer.clipboard_receive)
                             .unwrap_or(false);
                         if receive_ok {
+                            let event = match kind {
+                                ClipboardKind::Text => String::from_utf8(content)
+                                    .map(ClipboardEvent::Text)
+                                    .map_err(|_| "invalid UTF-8 clipboard text".to_owned()),
+                                ClipboardKind::ImagePng => Ok(ClipboardEvent::ImagePng(content)),
+                                ClipboardKind::FilesArchive => crate::clipboard_files::extract_archive(
+                                    &content,
+                                    transfer_id,
+                                )
+                                .map(ClipboardEvent::Files)
+                                .map_err(|e| e.to_string()),
+                            };
+                            let Ok(event) = event else {
+                                log::debug!("rejecting invalid clipboard payload {transfer_id} from {addr}");
+                                self.listener
+                                    .reply_clipboard_ack(addr, transfer_id, content_hash, false)
+                                    .await;
+                                continue;
+                            };
                             self.emulation_proxy.consume(
-                                Event::Clipboard(ClipboardEvent::Text(content.clone())),
+                                Event::Clipboard(event.clone()),
                                 addr,
                             );
                             self.event_tx.send(EmulationEvent::ClipboardReceived {
                                 addr,
                                 from_fingerprint,
-                                content,
+                                content: event,
                             }).expect("channel closed");
                         } else {
                             log::debug!(
